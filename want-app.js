@@ -10,6 +10,7 @@
     if (!HIDES.some(h => h[0] === hide)) hide = "book";
     let viewI = 0;
     let delivery = "collect";
+    let extras = extraFix();
     const types = ["", ...new Set(PAIRS.map(p => p.look))];
     const typeBox = document.getElementById("types");
     const grid = document.getElementById("grid");
@@ -18,7 +19,14 @@
     const sizes = document.getElementById("sizes");
     const dels = document.getElementById("dels");
     const msg = document.getElementById("msg");
+    const exrow = document.getElementById("exrow");
+    const laceCols = document.getElementById("lace-cols");
+    const stitchCols = document.getElementById("stitch-cols");
     function selected(){ return shoe(sku); }
+    function dueOf(p){
+      if(!p) return 0;
+      return p.price + extraSum(extras, 1) + feeOf(delivery);
+    }
     function setQuery(){
       const q = new URLSearchParams();
       if (type) q.set("type", type);
@@ -53,6 +61,7 @@
         const p = selected();
         if (p) type = p.look;
         viewI = 0;
+        if (p && !lacedLook(p.look)) extras.laces = false;
         draw();
         ask.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -72,9 +81,11 @@
       const shots = viewsOf(p, hide);
       if (viewI < 0) viewI = shots.length - 1;
       if (viewI >= shots.length) viewI = 0;
+      const extra = extraSum(extras, 1);
+      const extraBit = extraLabel(extras);
       hero.innerHTML = turnHtml(p, hide, viewI)+
-        '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+'</p></div>'+
-        '<div><p class="price">'+zar(p.price + feeOf(delivery))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+"</p></div></div>"+
+        '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
+        '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+(extra?" + extras":"")+"</p></div></div>"+
         '<label style="margin:10px 14px 0">Hide</label>'+
         '<div class="hides">'+hideChips(hide,"data-whide")+"</div>"+
         '<p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>';
@@ -84,6 +95,45 @@
         viewI = 0;
         drawHero();
         setQuery();
+      });
+    }
+    function drawExtras(){
+      const p = selected();
+      const laced = p && lacedLook(p.look);
+      if (!laced) extras.laces = false;
+      exrow.innerHTML =
+        '<button class="chip '+(extras.laser?"on":"")+'" type="button" data-ex="laser">Laser · R50</button>'+
+        (laced?'<button class="chip '+(extras.laces?"on":"")+'" type="button" data-ex="laces">Laces · R50</button>':"")+
+        '<button class="chip '+(extras.stitch?"on":"")+'" type="button" data-ex="stitch">Stitching · R50</button>'+
+        '<button class="chip '+(extras.custom?"on":"")+'" type="button" data-ex="custom">Custom · quoted</button>';
+      exrow.querySelectorAll("[data-ex]").forEach(b => b.onclick = function(){
+        const k = b.getAttribute("data-ex");
+        extras[k] = !extras[k];
+        if (k === "laser" && !extras.laser) extras.laserPhoto = "";
+        if (k === "custom" && !extras.custom) extras.customNote = "";
+        drawHero();
+        drawExtras();
+      });
+      document.getElementById("ex-laser").hidden = !extras.laser;
+      document.getElementById("ex-laces").hidden = !(extras.laces && laced);
+      document.getElementById("ex-stitch").hidden = !extras.stitch;
+      document.getElementById("ex-custom").hidden = !extras.custom;
+      const prev = document.getElementById("laser-preview");
+      if (extras.laserPhoto) { prev.src = extras.laserPhoto; prev.hidden = false; }
+      else { prev.removeAttribute("src"); prev.hidden = true; }
+      laceCols.innerHTML = colChips(LACE_COLS, extras.laceColour, "data-lace");
+      stitchCols.innerHTML = colChips(STITCH_COLS, extras.stitchColour, "data-stitch");
+      laceCols.querySelectorAll("[data-lace]").forEach(b => b.onclick = function(){
+        extras.laceColour = b.getAttribute("data-lace") || "natural";
+        extras.laces = true;
+        drawHero();
+        drawExtras();
+      });
+      stitchCols.querySelectorAll("[data-stitch]").forEach(b => b.onclick = function(){
+        extras.stitchColour = b.getAttribute("data-stitch") || "cream";
+        extras.stitch = true;
+        drawHero();
+        drawExtras();
       });
     }
     function drawSizes(){
@@ -110,8 +160,23 @@
       drawHero();
       drawSizes();
       drawDels();
+      drawExtras();
       setQuery();
     }
+    document.getElementById("laser-file").addEventListener("change", function(){
+      const f = this.files && this.files[0];
+      if (!f) return;
+      shrinkPic(f, function(data){
+        extras.laser = true;
+        extras.laserPhoto = data;
+        drawHero();
+        drawExtras();
+      });
+    });
+    document.getElementById("custom-note").addEventListener("input", function(){
+      extras.customNote = String(this.value || "").trim();
+      extras.custom = true;
+    });
     document.getElementById("want").addEventListener("submit", async function(e){
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
@@ -119,7 +184,10 @@
       const phone = String(f.phone||"").trim();
       if (name.length < 2) { msg.className = "err"; msg.textContent = "Need a name."; return; }
       if (digits(phone).length < 9) { msg.className = "err"; msg.textContent = "WhatsApp number."; return; }
+      extras.customNote = String(document.getElementById("custom-note").value || "").trim();
+      if (extras.customNote) extras.custom = true;
       const p = selected();
+      const packed = extraFix(extras);
       const lead = {
         name, phone, size,
         sku: p ? p.sku : "",
@@ -129,6 +197,8 @@
         delivery,
         deliveryFee: feeOf(delivery),
         colour: hide || "book",
+        extras: packed,
+        extrasFee: extraSum(packed, 1),
         note: String(f.note||"").trim(),
         source: "website",
         heat: "hot",
@@ -157,6 +227,10 @@
             look: lead.look,
             size: lead.size,
             hide: hideName(lead.colour),
+            extras: extraLabel(packed) || "None",
+            extrasFee: extraSum(packed, 1) ? zar(extraSum(packed, 1)) : "",
+            custom: packed.customNote || "",
+            laser: packed.laser ? "yes" : "no",
             delivery: lead.delivery,
             listed: p ? zar(p.price) : "",
             note: lead.note,
@@ -169,6 +243,10 @@
         ? "On the desk. We will WhatsApp you."
         : "Sent. If we do not reply today, WhatsApp the house.";
       e.target.reset();
+      extras = extraFix();
+      document.getElementById("custom-note").value = "";
+      drawExtras();
+      drawHero();
     });
     if (sku && !shoe(sku)) sku = "";
     if (sku) {

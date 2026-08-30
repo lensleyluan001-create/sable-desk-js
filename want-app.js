@@ -6,6 +6,9 @@
     let type = params.get("type") || "";
     let sku = params.get("sku") || "";
     let size = params.get("size") || "";
+    let hide = params.get("hide") || "book";
+    if (!HIDES.some(h => h[0] === hide)) hide = "book";
+    let viewI = 0;
     let delivery = "collect";
     const types = ["", ...new Set(PAIRS.map(p => p.look))];
     const typeBox = document.getElementById("types");
@@ -21,6 +24,7 @@
       if (type) q.set("type", type);
       if (sku) q.set("sku", sku);
       if (size) q.set("size", size);
+      if (hide && hide !== "book") q.set("hide", hide);
       const qs = q.toString();
       history.replaceState(null, "", qs ? ("?"+qs) : location.pathname);
     }
@@ -39,7 +43,7 @@
       const rows = PAIRS.filter(p => !type || p.look === type);
       if (!rows.length) { grid.innerHTML = '<p class="empty">Nothing in this type.</p>'; return; }
       grid.innerHTML = rows.map(p =>
-        '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+ 
+        '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+
           '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" loading="lazy" />'+
           '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+'</p><p class="price">'+zar(p.price)+"</p></div>"+
         "</button>"
@@ -48,17 +52,39 @@
         sku = b.getAttribute("data-sku") || "";
         const p = selected();
         if (p) type = p.look;
+        viewI = 0;
         draw();
         ask.scrollIntoView({ behavior: "smooth", block: "start" });
       });
+    }
+    function setView(d, abs){
+      const p = selected();
+      if (!p) return;
+      const n = viewsOf(p, hide).length;
+      if (abs != null) viewI = abs;
+      else viewI = (viewI + d + n) % n;
+      drawHero();
     }
     function drawHero(){
       const p = selected();
       if (!p) { ask.hidden = true; return; }
       ask.hidden = false;
-      hero.innerHTML = '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" />'+
-        '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+'</p></div>'+
-        '<div><p class="price">'+zar(p.price + feeOf(delivery))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+"</p></div></div>";
+      const shots = viewsOf(p, hide);
+      if (viewI < 0) viewI = shots.length - 1;
+      if (viewI >= shots.length) viewI = 0;
+      hero.innerHTML = turnHtml(p, hide, viewI)+
+        '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+'</p></div>'+
+        '<div><p class="price">'+zar(p.price + feeOf(delivery))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+"</p></div></div>"+
+        '<label style="margin:10px 14px 0">Hide</label>'+
+        '<div class="hides">'+hideChips(hide,"data-whide")+"</div>"+
+        '<p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>';
+      hookTurn(setView);
+      hero.querySelectorAll("[data-whide]").forEach(b => b.onclick = function(){
+        hide = b.getAttribute("data-whide") || "book";
+        viewI = 0;
+        drawHero();
+        setQuery();
+      });
     }
     function drawSizes(){
       sizes.innerHTML = ['<button class="chip '+(!size?"on":"")+'" type="button" data-size="">Later</button>']
@@ -102,6 +128,7 @@
         qty: 1,
         delivery,
         deliveryFee: feeOf(delivery),
+        colour: hide || "book",
         note: String(f.note||"").trim(),
         source: "website",
         heat: "hot",
@@ -129,6 +156,7 @@
             sku: lead.sku,
             look: lead.look,
             size: lead.size,
+            hide: hideName(lead.colour),
             delivery: lead.delivery,
             listed: p ? zar(p.price) : "",
             note: lead.note,
@@ -148,4 +176,3 @@
       if (p) type = type || p.look;
     }
     draw();
-  

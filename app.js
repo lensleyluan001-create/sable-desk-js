@@ -136,7 +136,7 @@ function extrasHtml(e,look,kind){
     html+='<label>Stitch colour</label><div class="chips">'+colChips(STITCH_COLS,e.stitchColour,"data-"+kind+"stitch")+"</div>";
   }
   if(e.custom){
-    html+='<label>Custom</label><textarea id="'+kind+'-custom" placeholder="What to change on the pair.">'+String(e.customNote||"").replace(/&/g,"&").replace(/</g,"<").replace(/>/g,">")+'</textarea>';
+    html+='<label>Custom</label><textarea id="'+kind+'-custom" placeholder="What to change on the pair.">'+esc(e.customNote||"")+'</textarea>';
     if(kind==="p") html+='<label>Custom amount</label><input id="p-customfee" inputmode="numeric" value="'+(e.customFee||"")+'" placeholder="Quoted ZAR" />';
     else html+='<p class="meta">Custom is quoted. The desk will confirm.</p>';
   }

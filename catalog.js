@@ -22,7 +22,7 @@ function viewHost(){
   }catch(e){}
   return "./views/";
 }
-function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=2"}
+function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=3"}
 function viewsOf(p,hide){
   const slug=typeSlug(p&&p.look);
   const studio=[1,2,3,4,5].map(n=>studioSrc(slug,n));

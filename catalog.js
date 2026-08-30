@@ -48,7 +48,10 @@ function hookTurn(setView){
   const box=document.querySelector(".turn");
   if(!box||typeof setView!=="function") return;
   let x0=null;
-  box.onpointerdown=function(e){x0=e.clientX;try{box.setPointerCapture(e.pointerId)}catch(err){}};
+  box.onpointerdown=function(e){
+    if(e.target&&e.target.closest&&e.target.closest("[data-view]")) return;
+    x0=e.clientX;
+  };
   box.onpointerup=function(e){
     if(x0==null) return;
     const dx=e.clientX-x0;

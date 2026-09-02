@@ -60,43 +60,114 @@ function matchSeller(name){
   if(q==="dylan"||q.indexOf("dylan")===0) return "dylan";
   return null;
 }
+function mixHex(hex, other, t){
+  function rgb(h){
+    h=String(h||"").replace("#","");
+    if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0];
+  }
+  const a=rgb(hex), b=rgb(other);
+  return "#"+[0,1,2].map(i=>Math.max(0,Math.min(255,Math.round(a[i]+(b[i]-a[i])*t))).toString(16).padStart(2,"0")).join("");
+}
+function xmlEsc(s){
+  const amp=String.fromCharCode(38)+"amp;";
+  const lt=String.fromCharCode(38)+"lt;";
+  const gt=String.fromCharCode(38)+"gt;";
+  const qt=String.fromCharCode(38)+"quot;";
+  return String(s||"").split(String.fromCharCode(38)).join(amp).split("<").join(lt).split(">").join(gt).split('"').join(qt);
+}
 function laceSvg(color,slug){
+  const id="l"+String(color||"").replace("#","");
+  const dark=mixHex(color,"#1c1814",0.42);
+  const lite=mixHex(color,"#f6f1e8",0.36);
   const n=/hike|combat|zip/.test(slug)?6:/golfer|derby/.test(slug)?5:4;
-  const xL=38,xR=62,y0=26,y1=78;
-  const eyes=[],cross=[];
+  const xL=35,xR=65,y0=20,y1=78;
   function pair(i){
     const t=n===1?0:i/(n-1);
-    const s=1-t*0.14;
+    const s=1-t*0.2;
     return [50-(50-xL)*s, y0+t*(y1-y0), 50+(xR-50)*s];
   }
+  const eyes=[], under=[], over=[];
   for(let i=0;i<n;i++){
     const [xl,y,xr]=pair(i);
-    eyes.push('<ellipse cx="'+xl+'" cy="'+y+'" rx="2.1" ry="1.5" fill="#14110e" stroke="'+color+'" stroke-width="0.7"/>');
-    eyes.push('<ellipse cx="'+xr+'" cy="'+y+'" rx="2.1" ry="1.5" fill="#14110e" stroke="'+color+'" stroke-width="0.7"/>');
+    eyes.push(
+      '<g transform="translate('+xl+","+y+')">'+
+        '<ellipse rx="2.7" ry="2" fill="#1a1612"/>'+
+        '<ellipse rx="2.4" ry="1.7" fill="none" stroke="#c4a574" stroke-width="0.7"/>'+
+        '<ellipse rx="1.2" ry="0.85" fill="#0c0a08"/>'+
+        '<ellipse cx="-0.4" cy="-0.4" rx="0.5" ry="0.35" fill="#eadcc488"/>'+
+      "</g>"+
+      '<g transform="translate('+xr+","+y+')">'+
+        '<ellipse rx="2.7" ry="2" fill="#1a1612"/>'+
+        '<ellipse rx="2.4" ry="1.7" fill="none" stroke="#c4a574" stroke-width="0.7"/>'+
+        '<ellipse rx="1.2" ry="0.85" fill="#0c0a08"/>'+
+        '<ellipse cx="-0.4" cy="-0.4" rx="0.5" ry="0.35" fill="#eadcc488"/>'+
+      "</g>"
+    );
     if(i<n-1){
       const [xl2,y2,xr2]=pair(i+1);
-      cross.push('<path d="M'+xl+" "+y+" C "+((xl+xr2)/2)+" "+(y-1.5)+", "+((xl+xr2)/2)+" "+(y2+1.5)+", "+xr2+" "+y2+'" fill="none" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/>');
-      cross.push('<path d="M'+xr+" "+y+" C "+((xr+xl2)/2)+" "+(y-1.5)+", "+((xr+xl2)/2)+" "+(y2+1.5)+", "+xl2+" "+y2+'" fill="none" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/>');
+      const a="M"+xl+" "+y+" C "+((xl+xr2)/2)+" "+(y+1)+", "+((xl+xr2)/2)+" "+(y2-1)+", "+xr2+" "+y2;
+      const b="M"+xr+" "+y+" C "+((xr+xl2)/2)+" "+(y+1)+", "+((xr+xl2)/2)+" "+(y2-1)+", "+xl2+" "+y2;
+      under.push('<path d="'+a+'" fill="none" stroke="'+dark+'" stroke-width="3.8" stroke-linecap="round"/>');
+      over.push('<path d="'+b+'" fill="none" stroke="url(#'+id+'g)" stroke-width="3.4" stroke-linecap="round"/>');
+      over.push('<path d="'+b+'" fill="none" stroke="'+lite+'" stroke-width="1.05" stroke-linecap="round" transform="translate(-0.55 -0.55)" opacity=".7"/>');
     }
   }
-  const bow='<path d="M42 22 C 34 14, 46 12, 50 20 C 54 12, 66 14, 58 22" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linecap="round"/><path d="M50 20 L50 27" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/><path d="M46 26 Q50 30 54 26" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linecap="round"/>';
-  return '<svg class="fit fit-laces" viewBox="0 0 100 100" aria-hidden="true">'+bow+cross.join("")+eyes.join("")+"</svg>";
+  const bow=
+    '<g filter="url(#'+id+'s)">'+
+      '<ellipse cx="43" cy="16" rx="6.5" ry="3.8" transform="rotate(-26 43 16)" fill="url(#'+id+'g)" stroke="'+dark+'" stroke-width="0.6"/>'+
+      '<ellipse cx="57" cy="16" rx="6.5" ry="3.8" transform="rotate(26 57 16)" fill="url(#'+id+'g)" stroke="'+dark+'" stroke-width="0.6"/>'+
+      '<ellipse cx="50" cy="17.8" rx="2.6" ry="2.1" fill="'+dark+'"/>'+
+      '<ellipse cx="50" cy="17.1" rx="1.6" ry="1.1" fill="'+lite+'" opacity=".55"/>'+
+      '<path d="M48.5 19.5 Q 45 28 46 36" fill="none" stroke="url(#'+id+'g)" stroke-width="2.2" stroke-linecap="round"/>'+
+      '<path d="M51.5 19.5 Q 56 27 54 37" fill="none" stroke="url(#'+id+'g)" stroke-width="2.2" stroke-linecap="round"/>'+
+    "</g>";
+  return '<svg class="fit fit-laces" viewBox="0 0 100 100" aria-hidden="true">'+
+    "<defs>"+
+      '<linearGradient id="'+id+'g" x1="0" y1="0" x2="1" y2="1">'+
+        '<stop offset="0" stop-color="'+lite+'"/>'+
+        '<stop offset=".42" stop-color="'+color+'"/>'+
+        '<stop offset="1" stop-color="'+dark+'"/>'+
+      "</linearGradient>"+
+      '<filter id="'+id+'s" x="-20%" y="-20%" width="140%" height="140%">'+
+        '<feDropShadow dx="0.35" dy="0.8" stdDeviation="0.5" flood-color="#000" flood-opacity=".4"/>'+
+      "</filter>"+
+    "</defs>"+
+    '<g filter="url(#'+id+'s)">'+under.join("")+over.join("")+"</g>"+
+    eyes.join("")+bow+
+  "</svg>";
 }
-function stitchSvg(color){
-  return '<svg class="fit fit-stitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
-    '<path d="M12 66 C 22 88, 78 92, 94 60" fill="none" stroke="'+color+'" stroke-width="0.95" stroke-dasharray="1.35 1.7" stroke-linecap="round"/>'+
-    '<path d="M20 52 C 34 40, 50 36, 68 44" fill="none" stroke="'+color+'" stroke-width="0.75" stroke-dasharray="1.1 1.55"/>'+
-    '<path d="M16 60 C 14 70, 18 80, 28 84" fill="none" stroke="'+color+'" stroke-width="0.7" stroke-dasharray="1.1 1.55"/>'+
-    '<path d="M78 48 C 84 52, 88 60, 86 70" fill="none" stroke="'+color+'" stroke-width="0.7" stroke-dasharray="1.1 1.55"/>'+
-    "</svg>";
+function stitchSvg(color,slug){
+  const welt={
+    chelsea:["M12 70 C 8 52, 22 28, 50 22 C 80 16, 98 32, 96 54 C 94 78, 62 90, 22 82","M24 40 C 24 56, 30 70, 42 78","M76 40 C 78 56, 72 72, 60 80"],
+    combat:["M14 76 C 8 54, 16 20, 48 12 C 80 4, 98 22, 96 48 C 96 76, 68 92, 26 88","M30 30 C 40 22, 58 20, 70 30","M28 50 C 40 40, 58 38, 72 50"],
+    hike:["M14 76 C 8 54, 16 20, 48 12 C 80 4, 98 22, 96 48 C 96 76, 68 92, 26 88","M30 30 C 40 22, 58 20, 70 30"],
+    loafer:["M14 70 C 10 52, 22 30, 52 24 C 80 18, 98 34, 94 56 C 92 78, 62 90, 24 82","M32 44 C 44 32, 62 32, 74 46"],
+    golfer:["M14 74 C 10 54, 20 30, 50 24 C 80 16, 98 32, 96 56 C 94 80, 60 92, 22 84","M28 50 C 42 36, 58 34, 72 48"],
+    derby:["M14 74 C 10 54, 20 30, 50 24 C 80 16, 98 32, 96 56 C 94 80, 60 92, 22 84","M28 50 C 42 36, 58 34, 72 48"]
+  };
+  const set=welt[slug]||["M14 72 C 10 54, 20 32, 50 26 C 80 18, 98 34, 96 56 C 94 78, 62 90, 24 84","M26 50 C 40 38, 58 36, 72 48"];
+  const lines=set.map(function(d,i){
+    const w=i===0?1.05:0.8;
+    return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-dasharray="1.25 1.7" stroke-linecap="round"/>';
+  }).join("");
+  return '<svg class="fit fit-stitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+lines+"</svg>";
+}
+function customTag(note){
+  const raw=String(note||"").trim().split(/\n/)[0];
+  const t=(raw||"Custom").slice(0,16);
+  return '<svg class="fit fit-custom" viewBox="0 0 92 32" aria-hidden="true">'+
+    '<rect x="1" y="1" width="90" height="30" rx="3" fill="#2a2118" stroke="#c4a574" stroke-width="1.15"/>'+
+    '<rect x="4.5" y="4.5" width="83" height="23" rx="2" fill="none" stroke="#c4a57466" stroke-width=".55"/>'+
+    '<text x="46" y="20" text-anchor="middle" font-size="8.5" font-family="Georgia,\'Iowan Old Style\',serif" letter-spacing="1.5" fill="#eadcc4">'+xmlEsc(t.toUpperCase())+"</text></svg>";
 }
 function extraPaint(p,extras,viewI){
   extras=extraFix(extras);
   const slug=typeSlug(p&&p.look);
   const bits=[];
   if(extras.laces&&lacedLook(p&&p.look)) bits.push(laceSvg(LACE_HEX[extras.laceColour]||LACE_HEX.natural,slug));
-  if(extras.stitch) bits.push(stitchSvg(STITCH_HEX[extras.stitchColour]||STITCH_HEX.cream));
-  if(extras.custom) bits.push('<div class="fit fit-custom"><span>Custom</span></div>');
+  if(extras.stitch) bits.push(stitchSvg(STITCH_HEX[extras.stitchColour]||STITCH_HEX.cream,slug));
+  if(extras.custom) bits.push(customTag(extras.customNote));
   if(!bits.length) return "";
   return '<div class="fit-layer" data-col="'+(extras.laces?extras.laceColour:"")+'">'+bits.join("")+"</div>";
 }
@@ -110,9 +181,9 @@ function turnHtml(p,hide,viewI,extras){
   const alt=p?(p.sku+" "+p.look):"";
   const dots=shots.map((_,n)=>'<button type="button" class="dot'+(n===i?" on":"")+'" data-view="'+n+'" aria-label="View '+(n+1)+'"></button>').join("");
   const look=typeSlug(p&&p.look);
-  return '<div class="turn" data-hide="'+hide+'" data-v="'+(i+1)+'" data-look="'+look+'"><img src="'+src+'" alt="'+alt+'" draggable="false" />'+
+  return '<div class="turn" data-hide="'+hide+'" data-v="'+(i+1)+'" data-look="'+look+'"><div class="stage"><img src="'+src+'" alt="'+alt+'" draggable="false" />'+
     extraPaint(p,extras,i)+
-    '<div class="dots">'+dots+"</div></div>";
+    '</div><div class="dots">'+dots+"</div></div>";
 }
 function hookTurn(setView){
   const box=document.querySelector(".turn");

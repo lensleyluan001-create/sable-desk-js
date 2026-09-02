@@ -165,6 +165,7 @@
     document.getElementById("custom-note").addEventListener("input", function(){
       extras.customNote = String(this.value || "").trim();
       extras.custom = true;
+      drawHero();
     });
     document.getElementById("want").addEventListener("submit", async function(e){
       e.preventDefault();

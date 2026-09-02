@@ -37,6 +37,7 @@ function leadFix(l){
     deliveryFee:Number(l.deliveryFee||0)||0,
     colour:l.colour||"book",
     extras:extraFix(l.extras),
+    listedPrice:Number(l.listedPrice)>0?Number(l.listedPrice):null,
     nextAction:l.nextAction||l.next||"",
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
@@ -81,7 +82,7 @@ let deskFilter="all";
 let boardCol="new";
 let pane="work";
 let personId=null;
-let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix()};
+let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix(),listedPrice:null};
 let pairView=0;
 let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
@@ -110,12 +111,13 @@ function leads(){
   return rows;
 }
 function firstMsg(l){
-  const p=shoe(l.sku);
+  const t=ticket(l);
   const who=l.name?("Hi "+l.name.split(" ")[0]):"Hi";
   const size=l.size
     ?("UK "+l.size+" is locked. Pair count if more than one and I will confirm.")
     :"Reply with UK size and pair count and I will confirm.";
-  return who+", this is SABLE.CO. Stock "+(l.sku||"")+" · "+(l.look||"")+" · "+zar(p?p.price:null)+". Handmade. Subject to availability. "+size;
+  const custom=isCustomPair(l)?" · Custom":"";
+  return who+", this is SABLE.CO. Stock "+(l.sku||"")+" · "+(l.look||"")+custom+" · "+zar(t.listed)+". Handmade. Subject to availability. "+size;
 }
 function feeOf(d){return d==="local"?100:d==="int"?300:0}
 function pickSku(raw){
@@ -127,13 +129,28 @@ function pickSku(raw){
   return shoe(d);
 }
 function delLabel(d){if(d==="local")return "Local R100";if(d==="int")return "International R300";return "Collect"}
+function unitListed(l){
+  const p=shoe(l&&l.sku);
+  const o=Number(l&&l.listedPrice);
+  if(o>0) return o;
+  return p?p.price:0;
+}
+function isCustomPair(l){
+  if(!l) return false;
+  const ex=extraFix(l.extras);
+  if(ex.custom||ex.customFee) return true;
+  const p=shoe(l.sku);
+  const o=Number(l.listedPrice);
+  return !!(p&&o>0&&o!==p.price);
+}
+function nametag(l){return isCustomPair(l)?'<span class="nametag">Custom</span>':""}
 function ticket(l){
   const p=shoe(l.sku);
   const qty=Number(l.qty||1)||1;
-  const listed=p?p.price*qty:0;
+  const listed=unitListed(l)*qty;
   const fee=Number(l.deliveryFee||0)||0;
   const extras=extraSum(l.extras,qty);
-  return {p,qty,listed,fee,extras,due:listed+fee+extras};
+  return {p,qty,listed,fee,extras,due:listed+fee+extras,custom:isCustomPair(l)};
 }
 function invRef(l){
   if(l&&l.invRef) return l.invRef;
@@ -177,9 +194,10 @@ function invMsg(l){
   const hide=l.colour&&l.colour!=="book"?(" · "+hideName(l.colour)):"";
   const extras=extraLabel(l.extras);
   const extraBit=extras?(" · "+extras+(t.extras?(" "+zar(t.extras)):"")):"";
+  const custom=t.custom?" Custom pair.":"";
   const ship=t.fee?("Delivery "+zar(t.fee)+" ("+delLabel(l.delivery)+")"):"Collect — no delivery";
   const bank=bankLines();
-  return who+", SABLE.CO invoice "+ref+". "+(l.sku||"")+" "+(l.look||"")+size+pairs+hide+extraBit+". Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from the desk with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT.";
+  return who+", SABLE.CO invoice "+ref+". "+(l.sku||"")+" "+(l.look||"")+size+pairs+hide+extraBit+"."+custom+" Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from Sable with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT.";
 }
 function localAt(iso){
   if(!iso) return "";
@@ -200,9 +218,9 @@ function followMsg(l){
 function Gate(){
   let form="";
   if(mode==="reset") form='<form class="card" id="reset"><label>Email</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. House key still works after you set one.</p>';
-  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><label>Desk</label><select name="seller"><option value="wian">Wian</option><option value="luan">Luan</option><option value="dylan">Dylan</option></select><button class="solid" type="submit">Send request</button></form>';
+  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><label>Who</label><select name="seller"><option value="wian">Wian</option><option value="luan">Luan</option><option value="dylan">Dylan</option></select><button class="solid" type="submit">Send request</button></form>';
   else form='<form class="card" id="signin"><label>Email or X handle</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" required /><label>Password</label><input name="password" type="password" required autocomplete="current-password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
-  const title=mode==="reset"?"New password":mode==="ask"?"Request a desk":"Log in";
+  const title=mode==="reset"?"New password":mode==="ask"?"Request Sable":"Log in";
   return '<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Luan email is filled in.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+"</div>";
 }
 function navBtns(){
@@ -216,7 +234,7 @@ function navBtns(){
 function deskChips(){
   if(!houseView()) return "";
   const n=id=>id==="all"?S.leads.length:S.leads.filter(l=>l.owner===id).length;
-  return '<div class="chips" style="margin:14px 0">'+[["all","All desks"],...SELLERS.map(s=>[s,SL[s]])].map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+" "+n(id)+"</button>").join("")+"</div>";
+  return '<div class="chips" style="margin:14px 0">'+[["all","Everyone"],...SELLERS.map(s=>[s,SL[s]])].map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+" "+n(id)+"</button>").join("")+"</div>";
 }
 function buildTodos(){
   const now=Date.now();
@@ -243,7 +261,7 @@ function buildTodos(){
     const mine=S.leads.filter(l=>l.owner===d);
     const open=mine.filter(l=>l.status!=="closed"&&l.status!=="lost");
     const capturedToday=mine.filter(l=>(l.createdAt||0)>=t0).length;
-    if(houseView()&&open.length===0) items.push({id:"fill-"+d,kind:"fill",lane:"second",step:"Fill this book",detail:"No open people on this desk.",owner:d,lead:null});
+    if(houseView()&&open.length===0) items.push({id:"fill-"+d,kind:"fill",lane:"second",step:"Fill this book",detail:"No open people on Sable.",owner:d,lead:null});
     else if(capturedToday===0) items.push({id:"cap-"+d,kind:"capture",lane:"second",step:"Capture someone today",detail:"Empty morning. Put a name on the board.",owner:d,lead:null});
     const paid=mine.filter(l=>l.status==="closed"&&l.paid).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
     const ref=paid.find(l=>{const age=now-(l.updatedAt||0);return age>5*DAY&&age<120*DAY&&!/who else/i.test(l.nextAction||"")});

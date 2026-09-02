@@ -11,7 +11,7 @@
     let viewI = 0;
     let delivery = "collect";
     let extras = extraFix();
-    const types = ["", ...new Set(PAIRS.map(p => p.look))];
+    const types = ["", ...looksOf()];
     const typeBox = document.getElementById("types");
     const grid = document.getElementById("grid");
     const ask = document.getElementById("ask");
@@ -47,15 +47,20 @@
         draw();
       });
     }
+    function tileHtml(p){
+      return '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+
+        '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" loading="lazy" />'+
+        '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+'</p><p class="price">'+zar(p.price)+"</p></div>"+
+      "</button>";
+    }
     function drawGrid(){
-      const rows = PAIRS.filter(p => !type || p.look === type);
-      if (!rows.length) { grid.innerHTML = '<p class="empty">Nothing in this type.</p>'; return; }
-      grid.innerHTML = rows.map(p =>
-        '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+
-          '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" loading="lazy" />'+
-          '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+'</p><p class="price">'+zar(p.price)+"</p></div>"+
-        "</button>"
-      ).join("");
+      const groups = type ? [type] : looksOf();
+      const html = groups.map(function(look){
+        const rows = PAIRS.filter(p => p.look === look);
+        if (!rows.length) return "";
+        return '<section class="cat"><h2>'+look+'</h2><div class="shelf">'+rows.map(tileHtml).join("")+"</div></section>";
+      }).join("");
+      grid.innerHTML = html || '<p class="empty">Nothing in this type.</p>';
       grid.querySelectorAll("[data-sku]").forEach(b => b.onclick = function(){
         sku = b.getAttribute("data-sku") || "";
         const p = selected();
@@ -84,7 +89,7 @@
       const extra = extraSum(extras, 1);
       const extraBit = extraLabel(extras);
       hero.innerHTML = turnHtml(p, hide, viewI)+
-        '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
+        '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
         '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+(extra?" + extras":"")+"</p></div></div>"+
         '<label style="margin:10px 14px 0">Hide</label>'+
         '<div class="hides">'+hideChips(hide,"data-whide")+"</div>"+
@@ -240,7 +245,7 @@
       } catch (err) {}
       msg.className = "ok";
       msg.textContent = ok
-        ? "On the desk. We will WhatsApp you."
+        ? "With Sable. We will WhatsApp you."
         : "Sent. If we do not reply today, WhatsApp the house.";
       e.target.reset();
       extras = extraFix();

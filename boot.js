@@ -37,7 +37,7 @@ function hookGate(){
     S.requests=S.requests||[];
     S.requests.push({name:String(f.name||"").trim(),email:String(f.email||"").trim(),password:String(f.password||""),seller:f.seller||"luan",status:"pending",at:Date.now()});
     save();
-    toast="Request saved on this phone. Open Luan admin desk to approve.";
+    toast="Request saved on this phone. Open Luan admin on Sable to approve.";
     mode="in";draw();
   };
 }
@@ -69,6 +69,12 @@ function scoopCap(){
   if(d.note!=null) cap.note=String(d.note);
   const noteEl=document.getElementById("cap-custom");
   if(noteEl){cap.extras=extraFix(cap.extras);cap.extras.customNote=String(noteEl.value||"").trim()}
+  const priceEl=document.getElementById("cap-price");
+  if(priceEl){
+    const p=shoe(cap.sku);
+    const n=Number(String(priceEl.value||"").replace(/[^\d]/g,""))||0;
+    cap.listedPrice=p&&n===p.price?null:(n||null);
+  }
 }
 function hookDesk(){
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
@@ -90,13 +96,13 @@ function hookDesk(){
   document.querySelectorAll("[data-del]").forEach(b=>b.onclick=function(){scoopCap();cap.delivery=b.getAttribute("data-del");draw()});
   document.querySelectorAll("[data-type]").forEach(b=>b.onclick=function(){scoopCap();cap.type=b.getAttribute("data-type")||"";draw()});
   const sku=document.getElementById("cap-sku");
-  if(sku) sku.onchange=function(){scoopCap();cap.sku=sku.value;cap.view=0;draw()};
+  if(sku) sku.onchange=function(){scoopCap();cap.sku=sku.value;cap.view=0;cap.listedPrice=null;const pair=shoe(cap.sku);if(pair) cap.type=pair.look;draw()};
   const skuIn=document.getElementById("cap-sku-in");
   if(skuIn){
     skuIn.onchange=function(){
       scoopCap();
       const p=pickSku(skuIn.value);
-      if(p){cap.sku=p.sku;cap.type=p.look;cap.view=0;draw()}
+      if(p){cap.sku=p.sku;cap.type=p.look;cap.view=0;cap.listedPrice=null;draw()}
     };
     skuIn.onkeydown=function(e){
       if(e.key==="Enter"){e.preventDefault();skuIn.blur()}
@@ -114,16 +120,19 @@ function hookDesk(){
     const p=shoe(cap.sku)||PAIRS[0];
     const noteEl=document.getElementById("cap-custom");
     if(noteEl){cap.extras=extraFix(cap.extras);cap.extras.customNote=String(noteEl.value||"").trim();if(cap.extras.customNote) cap.extras.custom=true}
+    const priceEl=document.getElementById("cap-price");
+    const typed=Number(String((f.listedPrice!=null&&f.listedPrice!==""?f.listedPrice:(priceEl&&priceEl.value)||"")).replace(/[^\d]/g,""))||0;
+    const listedPrice=typed&&typed!==p.price?typed:null;
     const lead=leadFix({
       id:uid(),name:cap.name,phone:cap.phone,sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,
       source:cap.source,status:"new",note:cap.note,owner:houseView()?cap.owner:mySeller(),
       delivery:cap.delivery,deliveryFee:feeOf(cap.delivery),colour:cap.colour||"book",
-      extras:extraFix(cap.extras),
+      extras:extraFix(cap.extras),listedPrice,
       createdAt:Date.now()
     });
     S.leads.unshift(lead);
     lastCapId=lead.id;
-    cap={sku:cap.sku,name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:cap.owner,type:cap.type,colour:"book",view:0,extras:extraFix()};
+    cap={sku:cap.sku,name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:cap.owner,type:cap.type,colour:"book",view:0,extras:extraFix(),listedPrice:null};
     personId=null;tab="capture";save();toast="On the board.";draw();
   };
   const meet=document.getElementById("meet");
@@ -190,8 +199,22 @@ function hookDesk(){
   if(psku) psku.onchange=function(){
     if(!personId) return;
     const pair=shoe(psku.value);
-    patchLead(personId,{sku:psku.value,look:pair?pair.look:""});
+    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null});
     pairView=0;
+    draw();
+  };
+  const cprice=document.getElementById("cap-price");
+  if(cprice) cprice.onchange=function(){
+    scoopCap();
+    draw();
+  };
+  const pprice=document.getElementById("p-price");
+  if(pprice) pprice.onchange=function(){
+    if(!personId) return;
+    const l=S.leads.find(x=>x.id===personId);
+    const pair=shoe(l&&l.sku);
+    const n=Number(String(pprice.value||"").replace(/[^\d]/g,""))||0;
+    patchLead(personId,{listedPrice:pair&&n===pair.price?null:(n||null)});
     draw();
   };
   hookExtras("cap",function(){return cap.extras},function(ex,quiet){
@@ -261,7 +284,7 @@ function hookDesk(){
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
     patchLead(b.getAttribute("data-take"),{owner:mySeller()});
-    toast="On this desk.";
+    toast="On Sable.";
     draw();
   });
   if(tab==="capture"&&toast==="On the board."){

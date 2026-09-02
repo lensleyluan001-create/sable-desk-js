@@ -22,11 +22,12 @@ function viewHost(){
   }catch(e){}
   return "./views/";
 }
-function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=3"}
+function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=4"}
 function viewsOf(p,hide){
-  const slug=typeSlug(p&&p.look);
-  const studio=[1,2,3,4,5].map(n=>studioSrc(slug,n));
-  if(!hide||hide==="book") return [(p&&p.img)||studio[0]].concat(studio.slice(1));
+  const sku=String(p&&p.sku||"");
+  const studio=[1,2,3,4,5].map(n=>viewHost()+sku+"-"+n+".jpg?v=4");
+  const book=(p&&p.img)||studio[0];
+  if(!hide||hide==="book") return [book].concat(studio.slice(1));
   return studio;
 }
 function hideSwatch(id){return HIDE_SWATCH[id]||HIDE_SWATCH.book}

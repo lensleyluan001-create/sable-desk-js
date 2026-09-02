@@ -530,23 +530,21 @@ function viewCapture(){
   const p=shoe(cap.sku)||PAIRS[14];
   cap.sku=p.sku;
   if(houseView()&&!cap.owner) cap.owner=mySeller();
-  const types=[...new Set(PAIRS.map(x=>x.look))];
-  const book=PAIRS.filter(x=>!cap.type||x.look===cap.type);
-  if(cap.type&&!book.some(x=>x.sku===p.sku)&&book[0]) {cap.sku=book[0].sku;return viewCapture()}
+  const book=PAIRS.slice();
   const last=lastCapId?S.leads.find(x=>x.id===lastCapId):null;
   const lastStrip=last?'<div class="card flash-row"><p class="ok" style="margin:0">On the board · '+esc(last.name)+'</p>'+(wa(last.phone,firstMsg(last))?'<a class="chip on" href="'+wa(last.phone,firstMsg(last))+'" data-wa="'+last.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+last.id+'">Open</button></div>':"";
-  const moreOn=!!(cap.size||(cap.colour&&cap.colour!=="book")||extraBits(cap.extras).length||cap.note||(cap.delivery&&cap.delivery!=="collect"));
-  return '<p class="kicker">On the floor</p><h1>Capture</h1><p class="sub">Name, WhatsApp, 45xxx. Size and extras later.</p>'+lastStrip+
-    '<article class="pair slim">'+turnHtml(p,cap.colour||"book",cap.view||0)+'<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+esc(p.look)+'</p><p class="price">'+zar(p.price+extraSum(cap.extras,1))+'</p></div></article>'+
-    '<label>Type</label><div class="chips"><button class="chip '+(!cap.type?"on":"")+'" type="button" data-type="">All</button>'+types.map(t=>'<button class="chip '+(cap.type===t?"on":"")+'" type="button" data-type="'+esc(t)+'">'+esc(t)+"</button>").join("")+"</div>"+
-    '<label>Pair</label><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" /><select id="cap-sku">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
+  const moreOn=!!(cap.size||extraBits(cap.extras).length||cap.note||(cap.delivery&&cap.delivery!=="collect"));
+  return '<p class="kicker">On the floor</p><h1>Capture</h1><p class="sub">Pair, hide, name, WhatsApp. Under a minute.</p>'+lastStrip+
+    '<article class="pair cap-pair">'+turnHtml(p,cap.colour||"book",cap.view||0)+
+    '<div class="hides">'+hideChips(cap.colour||"book","data-chide")+"</div>"+
+    '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+esc(p.look)+(cap.colour&&cap.colour!=="book"?" · "+hideName(cap.colour):" · as photographed")+'</p></div><p class="price">'+zar(p.price+extraSum(cap.extras,1))+"</p></div></article>"+
+    '<label>Stock</label><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" /><select id="cap-sku">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
     '<form class="card" id="cap">'+
     '<label>Name</label><input name="name" value="'+esc(cap.name)+'" required placeholder="As they say it" autocomplete="name" />'+
     '<label>WhatsApp</label><input name="phone" value="'+esc(cap.phone)+'" required inputmode="tel" placeholder="08 or 27" autocomplete="tel" />'+
     '<button class="solid" type="submit">Put on the board</button>'+
-    '<details class="more"'+(moreOn?" open":"")+"><summary>Size, hide, extras, send</summary>"+
+    '<details class="more"'+(moreOn?" open":"")+"><summary>Size, extras, send</summary>"+
     '<label>UK size</label><div class="chips">'+['<button class="chip '+(!cap.size?"on":"")+'" type="button" data-size="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(cap.size===s?"on":"")+'" type="button" data-size="'+s+'">'+s+"</button>")).join("")+"</div>"+
-    '<label>Hide</label><div class="hides">'+hideChips(cap.colour||"book","data-chide")+"</div>"+
     extrasHtml(cap.extras,p.look,"cap")+
     '<label>How they found us</label><div class="chips">'+SOURCES.map(([id,lab])=>'<button class="chip '+(cap.source===id?"on":"")+'" type="button" data-src="'+id+'">'+lab+"</button>").join("")+"</div>"+
     (houseView()?'<label>Desk</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(cap.owner===s?"on":"")+'" type="button" data-own="'+s+'">'+SL[s]+"</button>").join("")+"</div>":'<p class="meta">Lands on this desk · '+SL[mySeller()]+"</p>")+

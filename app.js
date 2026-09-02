@@ -31,10 +31,14 @@ function viewsOf(p,hide){
   return studio;
 }
 function hideSwatch(id){return HIDE_SWATCH[id]||HIDE_SWATCH.book}
-function hideChips(on,attr){
+function hideChips(on,attr,short){
   attr=attr||"data-hide";
   on=on||"book";
-  return HIDES.map(([id,lab])=>'<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+lab+"</button>").join("");
+  const shortLab={book:"Book",tan:"Tan",brown:"Brown",dark:"Dark",black:"Black",olive:"Olive"};
+  return HIDES.map(([id,lab])=>{
+    const t=short?shortLab[id]||lab:lab;
+    return '<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'" title="'+lab+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+t+"</button>";
+  }).join("");
 }
 function turnHtml(p,hide,viewI){
   hide=hide||"book";
@@ -534,15 +538,17 @@ function viewCapture(){
   const last=lastCapId?S.leads.find(x=>x.id===lastCapId):null;
   const lastStrip=last?'<div class="card flash-row"><p class="ok" style="margin:0">On the board · '+esc(last.name)+'</p>'+(wa(last.phone,firstMsg(last))?'<a class="chip on" href="'+wa(last.phone,firstMsg(last))+'" data-wa="'+last.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+last.id+'">Open</button></div>':"";
   const moreOn=!!(cap.size||extraBits(cap.extras).length||cap.note||(cap.delivery&&cap.delivery!=="collect"));
-  return '<p class="kicker">On the floor</p><h1>Capture</h1><p class="sub">Pair, hide, name, WhatsApp. Under a minute.</p>'+lastStrip+
-    '<article class="pair cap-pair">'+turnHtml(p,cap.colour||"book",cap.view||0)+
-    '<div class="hides">'+hideChips(cap.colour||"book","data-chide")+"</div>"+
-    '<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+esc(p.look)+(cap.colour&&cap.colour!=="book"?" · "+hideName(cap.colour):" · as photographed")+'</p></div><p class="price">'+zar(p.price+extraSum(cap.extras,1))+"</p></div></article>"+
-    '<label>Stock</label><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" /><select id="cap-sku">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
+  const hideLab=cap.colour&&cap.colour!=="book"?hideName(cap.colour):"as photographed";
+  return lastStrip+
+    '<article class="pair cap-pair">'+
+    '<div class="cap-shot">'+turnHtml(p,cap.colour||"book",cap.view||0)+
+    '<div class="hides">'+hideChips(cap.colour||"book","data-chide",true)+"</div></div>"+
+    '<div class="pad"><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" aria-label="Stock" /><select id="cap-sku" aria-label="Pair">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
+    '<div class="spread"><p class="meta">'+esc(p.look)+" · "+esc(hideLab)+'</p><p class="price">'+zar(p.price+extraSum(cap.extras,1))+"</p></div></div></article>"+
     '<form class="card" id="cap">'+
     '<label>Name</label><input name="name" value="'+esc(cap.name)+'" required placeholder="As they say it" autocomplete="name" />'+
     '<label>WhatsApp</label><input name="phone" value="'+esc(cap.phone)+'" required inputmode="tel" placeholder="08 or 27" autocomplete="tel" />'+
-    '<button class="solid" type="submit">Put on the board</button>'+
+    '<button class="solid tight" type="submit">Put on the board</button>'+
     '<details class="more"'+(moreOn?" open":"")+"><summary>Size, extras, send</summary>"+
     '<label>UK size</label><div class="chips">'+['<button class="chip '+(!cap.size?"on":"")+'" type="button" data-size="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(cap.size===s?"on":"")+'" type="button" data-size="'+s+'">'+s+"</button>")).join("")+"</div>"+
     extrasHtml(cap.extras,p.look,"cap")+

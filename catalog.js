@@ -31,10 +31,14 @@ function viewsOf(p,hide){
   return studio;
 }
 function hideSwatch(id){return HIDE_SWATCH[id]||HIDE_SWATCH.book}
-function hideChips(on,attr){
+function hideChips(on,attr,short){
   attr=attr||"data-hide";
   on=on||"book";
-  return HIDES.map(([id,lab])=>'<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+lab+"</button>").join("");
+  const shortLab={book:"Book",tan:"Tan",brown:"Brown",dark:"Dark",black:"Black",olive:"Olive"};
+  return HIDES.map(([id,lab])=>{
+    const t=short?shortLab[id]||lab:lab;
+    return '<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'" title="'+lab+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+t+"</button>";
+  }).join("");
 }
 function turnHtml(p,hide,viewI){
   hide=hide||"book";

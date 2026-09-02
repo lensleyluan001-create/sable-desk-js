@@ -29,7 +29,7 @@ function viewBoard(){
     const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
+    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
   }
   if(pane==="money"&&seeCost()){
     let listed=0,profit=0,cuts={wian:0,luan:0,dylan:0,house:0};
@@ -65,7 +65,7 @@ function viewCapture(){
   return lastStrip+
     typeRow+
     '<article class="pair cap-pair">'+
-    '<div class="cap-shot">'+turnHtml(p,cap.colour||"book",cap.view||0)+
+    '<div class="cap-shot">'+turnHtml(p,cap.colour||"book",cap.view||0,cap.extras)+
     '<div class="hides">'+hideChips(cap.colour||"book","data-chide",true)+"</div></div>"+
     '<div class="pad"><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" aria-label="Stock" /><select id="cap-sku" aria-label="Pair">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
     '<div class="spread"><p class="meta">'+esc(p.look)+" · "+esc(hideLab)+'</p><div class="price-edit"><input id="cap-price" form="cap" name="listedPrice" inputmode="numeric" value="'+shown+'" aria-label="Pair price" />'+(customOn?'<span class="nametag">Custom</span>':"")+"</div></div></div></article>"+
@@ -111,7 +111,7 @@ function viewPerson(){
   const waSize=wa(l.phone,sizeMsg(l));
   const waPay=wa(l.phone,payMsg(l));
   const waFollow=wa(l.phone,followMsg(l));
-  const pairImg=p?turnHtml(p,l.colour||"book",pairView||0):"";
+  const pairImg=p?turnHtml(p,l.colour||"book",pairView||0,l.extras):"";
   const skuOpts=PAIRS.map(x=>'<option value="'+x.sku+'"'+(x.sku===l.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+" · "+zar(x.price)+"</option>").join("");
   const sizeChips=['<button class="chip '+(!l.size?"on":"")+'" type="button" data-psize="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(String(l.size)===s?"on":"")+'" type="button" data-psize="'+s+'">'+s+"</button>")).join("");
   const qtyChips=[1,2,3,4].map(n=>'<button class="chip '+(t.qty===n?"on":"")+'" type="button" data-pqty="'+n+'">'+n+"</button>").join("");
@@ -121,7 +121,7 @@ function viewPerson(){
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card"><div class="line"><span>'+(t.custom?"Custom pair":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+unitListed(l)+'" aria-label="Pair price" /></span></div>'+(p&&t.custom&&unitListed(l)!==p.price?'<div class="line"><span>Book</span><span>'+zar(p.price)+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
   const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
-  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+"</p>"+
+  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+"</p>"+
     waRow+
     (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
     '<label>UK size</label><div class="chips">'+sizeChips+"</div>"+

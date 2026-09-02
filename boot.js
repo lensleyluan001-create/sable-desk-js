@@ -324,7 +324,7 @@ async function ingest(){
     let changed=false;
     for(const row of incoming){
       if(S.leads.some(l=>l.id===row.id||(norm(l.phone)===norm(row.phone)&&norm(l.name)===norm(row.name)))) continue;
-      S.leads.unshift(leadFix(Object.assign({},row,{status:"new",source:row.source||"website",owner:null})));
+      S.leads.unshift(leadFix(Object.assign({},row,{status:"new",source:row.source||"website"})));
       changed=true;
     }
     if(changed) save();

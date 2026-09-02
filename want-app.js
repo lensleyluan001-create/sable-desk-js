@@ -88,7 +88,7 @@
       if (viewI >= shots.length) viewI = 0;
       const extra = extraSum(extras, 1);
       const extraBit = extraLabel(extras);
-      hero.innerHTML = turnHtml(p, hide, viewI)+
+      hero.innerHTML = turnHtml(p, hide, viewI, extras)+
         '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
         '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+(extra?" + extras":"")+"</p></div></div>"+
         '<label style="margin:10px 14px 0">Hide</label>'+
@@ -107,25 +107,19 @@
       const laced = p && lacedLook(p.look);
       if (!laced) extras.laces = false;
       exrow.innerHTML =
-        '<button class="chip '+(extras.laser?"on":"")+'" type="button" data-ex="laser">Laser · R50</button>'+
         (laced?'<button class="chip '+(extras.laces?"on":"")+'" type="button" data-ex="laces">Laces · R50</button>':"")+
         '<button class="chip '+(extras.stitch?"on":"")+'" type="button" data-ex="stitch">Stitching · R50</button>'+
         '<button class="chip '+(extras.custom?"on":"")+'" type="button" data-ex="custom">Custom · quoted</button>';
       exrow.querySelectorAll("[data-ex]").forEach(b => b.onclick = function(){
         const k = b.getAttribute("data-ex");
         extras[k] = !extras[k];
-        if (k === "laser" && !extras.laser) extras.laserPhoto = "";
         if (k === "custom" && !extras.custom) extras.customNote = "";
         drawHero();
         drawExtras();
       });
-      document.getElementById("ex-laser").hidden = !extras.laser;
       document.getElementById("ex-laces").hidden = !(extras.laces && laced);
       document.getElementById("ex-stitch").hidden = !extras.stitch;
       document.getElementById("ex-custom").hidden = !extras.custom;
-      const prev = document.getElementById("laser-preview");
-      if (extras.laserPhoto) { prev.src = extras.laserPhoto; prev.hidden = false; }
-      else { prev.removeAttribute("src"); prev.hidden = true; }
       laceCols.innerHTML = colChips(LACE_COLS, extras.laceColour, "data-lace");
       stitchCols.innerHTML = colChips(STITCH_COLS, extras.stitchColour, "data-stitch");
       laceCols.querySelectorAll("[data-lace]").forEach(b => b.onclick = function(){
@@ -168,16 +162,6 @@
       drawExtras();
       setQuery();
     }
-    document.getElementById("laser-file").addEventListener("change", function(){
-      const f = this.files && this.files[0];
-      if (!f) return;
-      shrinkPic(f, function(data){
-        extras.laser = true;
-        extras.laserPhoto = data;
-        drawHero();
-        drawExtras();
-      });
-    });
     document.getElementById("custom-note").addEventListener("input", function(){
       extras.customNote = String(this.value || "").trim();
       extras.custom = true;
@@ -191,8 +175,11 @@
       if (digits(phone).length < 9) { msg.className = "err"; msg.textContent = "WhatsApp number."; return; }
       extras.customNote = String(document.getElementById("custom-note").value || "").trim();
       if (extras.customNote) extras.custom = true;
+      extras.laser = false;
+      extras.laserPhoto = "";
       const p = selected();
       const packed = extraFix(extras);
+      const salesman = String(f.salesman || "").trim();
       const lead = {
         name, phone, size,
         sku: p ? p.sku : "",
@@ -205,6 +192,8 @@
         extras: packed,
         extrasFee: extraSum(packed, 1),
         note: String(f.note||"").trim(),
+        salesman,
+        owner: matchSeller(salesman),
         source: "website",
         heat: "hot",
         createdAt: Date.now()
@@ -235,7 +224,7 @@
             extras: extraLabel(packed) || "None",
             extrasFee: extraSum(packed, 1) ? zar(extraSum(packed, 1)) : "",
             custom: packed.customNote || "",
-            laser: packed.laser ? "yes" : "no",
+            salesman: salesman || "",
             delivery: lead.delivery,
             listed: p ? zar(p.price) : "",
             note: lead.note,

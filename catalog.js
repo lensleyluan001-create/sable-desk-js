@@ -50,7 +50,57 @@ function hideChips(on,attr,short){
     return '<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'" title="'+lab+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+t+"</button>";
   }).join("");
 }
-function turnHtml(p,hide,viewI){
+const LACE_HEX={natural:"#d7c6a6",tan:"#c49a62",brown:"#6b4634",black:"#1c1814",olive:"#5c6848",white:"#f6f1e8"};
+const STITCH_HEX={cream:"#eadcc4",tan:"#c49a62",brown:"#6b4634",black:"#1c1814",olive:"#5c6848",white:"#f6f1e8"};
+function matchSeller(name){
+  const q=String(name||"").trim().toLowerCase();
+  if(!q) return null;
+  if(q==="wian"||q.indexOf("wian")===0) return "wian";
+  if(q==="luan"||q.indexOf("luan")===0) return "luan";
+  if(q==="dylan"||q.indexOf("dylan")===0) return "dylan";
+  return null;
+}
+function laceSvg(color,slug){
+  const n=/hike|combat|zip/.test(slug)?6:/golfer|derby/.test(slug)?5:4;
+  const xL=38,xR=62,y0=26,y1=78;
+  const eyes=[],cross=[];
+  function pair(i){
+    const t=n===1?0:i/(n-1);
+    const s=1-t*0.14;
+    return [50-(50-xL)*s, y0+t*(y1-y0), 50+(xR-50)*s];
+  }
+  for(let i=0;i<n;i++){
+    const [xl,y,xr]=pair(i);
+    eyes.push('<ellipse cx="'+xl+'" cy="'+y+'" rx="2.1" ry="1.5" fill="#14110e" stroke="'+color+'" stroke-width="0.7"/>');
+    eyes.push('<ellipse cx="'+xr+'" cy="'+y+'" rx="2.1" ry="1.5" fill="#14110e" stroke="'+color+'" stroke-width="0.7"/>');
+    if(i<n-1){
+      const [xl2,y2,xr2]=pair(i+1);
+      cross.push('<path d="M'+xl+" "+y+" C "+((xl+xr2)/2)+" "+(y-1.5)+", "+((xl+xr2)/2)+" "+(y2+1.5)+", "+xr2+" "+y2+'" fill="none" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/>');
+      cross.push('<path d="M'+xr+" "+y+" C "+((xr+xl2)/2)+" "+(y-1.5)+", "+((xr+xl2)/2)+" "+(y2+1.5)+", "+xl2+" "+y2+'" fill="none" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/>');
+    }
+  }
+  const bow='<path d="M42 22 C 34 14, 46 12, 50 20 C 54 12, 66 14, 58 22" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linecap="round"/><path d="M50 20 L50 27" stroke="'+color+'" stroke-width="2.3" stroke-linecap="round"/><path d="M46 26 Q50 30 54 26" fill="none" stroke="'+color+'" stroke-width="1.8" stroke-linecap="round"/>';
+  return '<svg class="fit fit-laces" viewBox="0 0 100 100" aria-hidden="true">'+bow+cross.join("")+eyes.join("")+"</svg>";
+}
+function stitchSvg(color){
+  return '<svg class="fit fit-stitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
+    '<path d="M12 66 C 22 88, 78 92, 94 60" fill="none" stroke="'+color+'" stroke-width="0.95" stroke-dasharray="1.35 1.7" stroke-linecap="round"/>'+
+    '<path d="M20 52 C 34 40, 50 36, 68 44" fill="none" stroke="'+color+'" stroke-width="0.75" stroke-dasharray="1.1 1.55"/>'+
+    '<path d="M16 60 C 14 70, 18 80, 28 84" fill="none" stroke="'+color+'" stroke-width="0.7" stroke-dasharray="1.1 1.55"/>'+
+    '<path d="M78 48 C 84 52, 88 60, 86 70" fill="none" stroke="'+color+'" stroke-width="0.7" stroke-dasharray="1.1 1.55"/>'+
+    "</svg>";
+}
+function extraPaint(p,extras,viewI){
+  extras=extraFix(extras);
+  const slug=typeSlug(p&&p.look);
+  const bits=[];
+  if(extras.laces&&lacedLook(p&&p.look)) bits.push(laceSvg(LACE_HEX[extras.laceColour]||LACE_HEX.natural,slug));
+  if(extras.stitch) bits.push(stitchSvg(STITCH_HEX[extras.stitchColour]||STITCH_HEX.cream));
+  if(extras.custom) bits.push('<div class="fit fit-custom"><span>Custom</span></div>');
+  if(!bits.length) return "";
+  return '<div class="fit-layer" data-col="'+(extras.laces?extras.laceColour:"")+'">'+bits.join("")+"</div>";
+}
+function turnHtml(p,hide,viewI,extras){
   hide=hide||"book";
   const shots=viewsOf(p,hide);
   let i=Number(viewI)||0;
@@ -59,7 +109,9 @@ function turnHtml(p,hide,viewI){
   const src=shots[i]||(p&&p.img)||"";
   const alt=p?(p.sku+" "+p.look):"";
   const dots=shots.map((_,n)=>'<button type="button" class="dot'+(n===i?" on":"")+'" data-view="'+n+'" aria-label="View '+(n+1)+'"></button>').join("");
-  return '<div class="turn" data-hide="'+hide+'"><img src="'+src+'" alt="'+alt+'" draggable="false" />'+
+  const look=typeSlug(p&&p.look);
+  return '<div class="turn" data-hide="'+hide+'" data-v="'+(i+1)+'" data-look="'+look+'"><img src="'+src+'" alt="'+alt+'" draggable="false" />'+
+    extraPaint(p,extras,i)+
     '<div class="dots">'+dots+"</div></div>";
 }
 function hookTurn(setView){

@@ -571,7 +571,7 @@ function viewPerson(){
 function Desk(){
   const body=personId?viewPerson():tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
-  return '<div class="shell'+(navOpen?" nav-open":"")+'"><aside class="side'+(navOpen?" is-open":"")+'"><div class="side-head"><div class="side-brand"><span class="side-s">S</span><span class="side-word">ABLE</span></div><button type="button" class="nav-pin" id="nav-pin" aria-pressed="'+(navOpen?"true":"false")+'" title="'+(navOpen?"Collapse menu":"Pin menu open")+'">'+(navOpen?"‹":"›")+'</button></div><nav class="side-nav" aria-label="Desk">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><button class="ghost" type="button" id="out2">Sign out</button></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Desk'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
+  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Desk">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><button class="ghost" type="button" id="out2">Sign out</button></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Desk'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }
 function draw(){
   const root=document.getElementById("root");
@@ -636,8 +636,6 @@ function doDone(tid){
   draw();
 }
 function hookDesk(){
-  const pin=document.getElementById("nav-pin");
-  if(pin) pin.onclick=function(){setNavOpen(!navOpen);draw()};
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
   document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});

@@ -61,8 +61,6 @@ function doDone(tid){
   draw();
 }
 function hookDesk(){
-  const pin=document.getElementById("nav-pin");
-  if(pin) pin.onclick=function(){setNavOpen(!navOpen);draw()};
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
   document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});

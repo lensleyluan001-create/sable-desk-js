@@ -83,6 +83,7 @@ let pane="work";
 let personId=null;
 let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix()};
 let pairView=0;
+let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
 function setNavOpen(on){
   navOpen=!!on;
@@ -117,6 +118,14 @@ function firstMsg(l){
   return who+", this is SABLE.CO. Stock "+(l.sku||"")+" · "+(l.look||"")+" · "+zar(p?p.price:null)+". Handmade. Subject to availability. "+size;
 }
 function feeOf(d){return d==="local"?100:d==="int"?300:0}
+function pickSku(raw){
+  const d=String(raw||"").replace(/\D/g,"");
+  if(!d) return null;
+  if(d.length<=2) return shoe(String(45000+Number(d)));
+  if(d.length===3) return shoe("45"+d)||shoe(d);
+  if(d.length===4) return shoe("4"+d)||shoe(d);
+  return shoe(d);
+}
 function delLabel(d){if(d==="local")return "Local R100";if(d==="int")return "International R300";return "Collect"}
 function ticket(l){
   const p=shoe(l.sku);

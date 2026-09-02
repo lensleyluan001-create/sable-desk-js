@@ -296,6 +296,7 @@ let pane="work";
 let personId=null;
 let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix()};
 let pairView=0;
+let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
 function setNavOpen(on){
   navOpen=!!on;
@@ -330,6 +331,14 @@ function firstMsg(l){
   return who+", this is SABLE.CO. Stock "+(l.sku||"")+" · "+(l.look||"")+" · "+zar(p?p.price:null)+". Handmade. Subject to availability. "+size;
 }
 function feeOf(d){return d==="local"?100:d==="int"?300:0}
+function pickSku(raw){
+  const d=String(raw||"").replace(/\D/g,"");
+  if(!d) return null;
+  if(d.length<=2) return shoe(String(45000+Number(d)));
+  if(d.length===3) return shoe("45"+d)||shoe(d);
+  if(d.length===4) return shoe("4"+d)||shoe(d);
+  return shoe(d);
+}
 function delLabel(d){if(d==="local")return "Local R100";if(d==="int")return "International R300";return "Collect"}
 function ticket(l){
   const p=shoe(l.sku);
@@ -499,7 +508,7 @@ function viewBoard(){
     const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",p?zar(p.price):""].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip" href="'+wa(l.phone,firstMsg(l))+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div></div></div>';
+    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",p?zar(p.price):""].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
   }
   if(pane==="money"&&seeCost()){
     let listed=0,profit=0,cuts={wian:0,luan:0,dylan:0,house:0};
@@ -524,12 +533,30 @@ function viewCapture(){
   const types=[...new Set(PAIRS.map(x=>x.look))];
   const book=PAIRS.filter(x=>!cap.type||x.look===cap.type);
   if(cap.type&&!book.some(x=>x.sku===p.sku)&&book[0]) {cap.sku=book[0].sku;return viewCapture()}
-  return '<p class="kicker">On the floor</p><h1>Capture</h1><p class="sub">Name. WhatsApp. The 45xxx. Put them on the board. Cost stays off this ticket.</p><div class="two"><section><article class="pair">'+turnHtml(p,cap.colour||"book",cap.view||0)+'<div class="pad"><div><p class="stock">'+p.sku+'</p><p class="meta">'+esc(p.look)+'</p></div><div><p class="price">'+zar(p.price+extraSum(cap.extras,1))+'</p><p class="kicker">Listed'+(extraSum(cap.extras,1)?" + extras":"")+'</p></div></div></article><label>Type</label><div class="chips"><button class="chip '+(!cap.type?"on":"")+'" type="button" data-type="">All</button>'+types.map(t=>'<button class="chip '+(cap.type===t?"on":"")+'" type="button" data-type="'+esc(t)+'">'+esc(t)+"</button>").join("")+'</div><label>Pair</label><select id="cap-sku">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+" · "+zar(x.price)+"</option>").join("")+"</select></section><section><form class='card' id='cap'><p class='kicker'>Ticket</p><p class='name'>"+esc(cap.name||"The person")+'</p><p class="meta">'+p.sku+" · "+esc(p.look)+(cap.size?(" · UK "+cap.size):" · size later")+" · "+(cap.delivery==="collect"?"collect":"send")+'</p><label>Name</label><input name="name" value="'+esc(cap.name)+'" required placeholder="As they say it" /><label>WhatsApp</label><input name="phone" value="'+esc(cap.phone)+'" required inputmode="tel" placeholder="08 or 27" /><label>UK size</label><div class="chips">'+['<button class="chip '+(!cap.size?"on":"")+'" type="button" data-size="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(cap.size===s?"on":"")+'" type="button" data-size="'+s+'">'+s+"</button>")).join("")+'</div><label>Hide</label><div class="hides">'+hideChips(cap.colour||"book","data-chide")+'</div><p class="meta">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>'+extrasHtml(cap.extras,p.look,"cap")+'<label>How they found us</label><div class="chips">'+SOURCES.map(([id,lab])=>'<button class="chip '+(cap.source===id?"on":"")+'" type="button" data-src="'+id+'">'+lab+"</button>").join("")+"</div>"+(houseView()?'<label>Desk</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(cap.owner===s?"on":"")+'" type="button" data-own="'+s+'">'+SL[s]+"</button>").join("")+"</div>":'<p class="meta">Lands on this desk · '+SL[mySeller()]+"</p>")+'<label>Collect or send</label><div class="chips"><button class="chip '+(cap.delivery==="collect"?"on":"")+'" type="button" data-del="collect">Collect</button><button class="chip '+(cap.delivery==="local"?"on":"")+'" type="button" data-del="local">Local R100</button><button class="chip '+(cap.delivery==="int"?"on":"")+'" type="button" data-del="int">International R300</button></div><label>Note</label><input name="note" value="'+esc(cap.note)+'" placeholder="Tan hide. Call after 6." /><button class="solid" type="submit">Put on the board</button></form></section></div>';
+  const last=lastCapId?S.leads.find(x=>x.id===lastCapId):null;
+  const lastStrip=last?'<div class="card flash-row"><p class="ok" style="margin:0">On the board · '+esc(last.name)+'</p>'+(wa(last.phone,firstMsg(last))?'<a class="chip on" href="'+wa(last.phone,firstMsg(last))+'" data-wa="'+last.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+last.id+'">Open</button></div>':"";
+  const moreOn=!!(cap.size||(cap.colour&&cap.colour!=="book")||extraBits(cap.extras).length||cap.note||(cap.delivery&&cap.delivery!=="collect"));
+  return '<p class="kicker">On the floor</p><h1>Capture</h1><p class="sub">Name, WhatsApp, 45xxx. Size and extras later.</p>'+lastStrip+
+    '<article class="pair slim">'+turnHtml(p,cap.colour||"book",cap.view||0)+'<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+esc(p.look)+'</p><p class="price">'+zar(p.price+extraSum(cap.extras,1))+'</p></div></article>'+
+    '<label>Type</label><div class="chips"><button class="chip '+(!cap.type?"on":"")+'" type="button" data-type="">All</button>'+types.map(t=>'<button class="chip '+(cap.type===t?"on":"")+'" type="button" data-type="'+esc(t)+'">'+esc(t)+"</button>").join("")+"</div>"+
+    '<label>Pair</label><div class="sku-row"><input id="cap-sku-in" inputmode="numeric" placeholder="45015" value="'+p.sku+'" /><select id="cap-sku">'+book.map(x=>'<option value="'+x.sku+'"'+(x.sku===p.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+"</option>").join("")+"</select></div>"+
+    '<form class="card" id="cap">'+
+    '<label>Name</label><input name="name" value="'+esc(cap.name)+'" required placeholder="As they say it" autocomplete="name" />'+
+    '<label>WhatsApp</label><input name="phone" value="'+esc(cap.phone)+'" required inputmode="tel" placeholder="08 or 27" autocomplete="tel" />'+
+    '<button class="solid" type="submit">Put on the board</button>'+
+    '<details class="more"'+(moreOn?" open":"")+"><summary>Size, hide, extras, send</summary>"+
+    '<label>UK size</label><div class="chips">'+['<button class="chip '+(!cap.size?"on":"")+'" type="button" data-size="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(cap.size===s?"on":"")+'" type="button" data-size="'+s+'">'+s+"</button>")).join("")+"</div>"+
+    '<label>Hide</label><div class="hides">'+hideChips(cap.colour||"book","data-chide")+"</div>"+
+    extrasHtml(cap.extras,p.look,"cap")+
+    '<label>How they found us</label><div class="chips">'+SOURCES.map(([id,lab])=>'<button class="chip '+(cap.source===id?"on":"")+'" type="button" data-src="'+id+'">'+lab+"</button>").join("")+"</div>"+
+    (houseView()?'<label>Desk</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(cap.owner===s?"on":"")+'" type="button" data-own="'+s+'">'+SL[s]+"</button>").join("")+"</div>":'<p class="meta">Lands on this desk · '+SL[mySeller()]+"</p>")+
+    '<label>Collect or send</label><div class="chips"><button class="chip '+(cap.delivery==="collect"?"on":"")+'" type="button" data-del="collect">Collect</button><button class="chip '+(cap.delivery==="local"?"on":"")+'" type="button" data-del="local">Local R100</button><button class="chip '+(cap.delivery==="int"?"on":"")+'" type="button" data-del="int">International R300</button></div>'+
+    '<label>Note</label><input name="note" value="'+esc(cap.note)+'" placeholder="Tan hide. Call after 6." /></details></form>';
 }
 function viewClients(){
   const rows=leads();
   const q="";
-  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. Nothing fake on this list.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row"><button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on this desk yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
+  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. Nothing fake on this list.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on this desk yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
 }
 function viewMeetings(){
   const now=Date.now();
@@ -565,9 +592,15 @@ function viewPerson(){
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const desk=houseView()?'<label>Desk</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card"><div class="line"><span>Listed</span><span>'+zar(t.listed)+'</span></div>'+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
-  const waRow='<div class="row" style="margin:14px 0 4px">'+(waFirst?'<a class="chip on" href="'+waFirst+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button></div>';
-  const paidRow='<div class="row" style="margin:16px 0">'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close the card</button>':"")+"</div>";
-  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="clients">Clients</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+'</p><div class="two"><section><article class="pair">'+pairImg+'<div class="pad"><div><p class="stock">'+esc(l.sku||"—")+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+'</p></div><div><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></div></article><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>UK size</label><div class="chips">'+sizeChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div><p class="meta">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></section><section>"+money+'<label>Stage</label><div class="chips">'+stageChips+"</div>"+desk+waRow+paidRow+'<form class="card" id="pnext" style="margin-top:12px"><p class="kicker">Next</p><label>What to do</label><input name="next" value="'+esc(l.nextAction||"")+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><button class="solid" type="submit">Save next</button></form><form class="card" id="pinfo" style="margin-top:12px"><p class="kicker">Person</p><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><button class="solid" type="submit">Save person</button></form><form class="card" id="pnote" style="margin-top:12px"><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save note</button></form></section></div>';
+  const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+"</p>"+
+    waRow+
+    (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
+    '<label>UK size</label><div class="chips">'+sizeChips+"</div>"+
+    '<label>Stage</label><div class="chips">'+stageChips+"</div>"+
+    desk+money+
+    '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
+    '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(l.nextAction||"")+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
 }
 function Desk(){
   const body=personId?viewPerson():tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
@@ -636,6 +669,16 @@ function doDone(tid){
   else patchLead(l.id,{nextAction:it.kind==="size"?"Follow up on the pair":it.step,nextActionAt:new Date(Date.now()+(it.kind==="pay"?12:24)*3600000).toISOString()});
   draw();
 }
+function scoopCap(){
+  const f=document.getElementById("cap");
+  if(!f) return;
+  const d=Object.fromEntries(new FormData(f));
+  if(d.name!=null) cap.name=String(d.name);
+  if(d.phone!=null) cap.phone=String(d.phone);
+  if(d.note!=null) cap.note=String(d.note);
+  const noteEl=document.getElementById("cap-custom");
+  if(noteEl){cap.extras=extraFix(cap.extras);cap.extras.customNote=String(noteEl.value||"").trim()}
+}
 function hookDesk(){
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
@@ -650,13 +693,24 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
-  document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){cap.size=b.getAttribute("data-size");draw()});
-  document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){cap.source=b.getAttribute("data-src");draw()});
-  document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){cap.owner=b.getAttribute("data-own");draw()});
-  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=function(){cap.delivery=b.getAttribute("data-del");draw()});
-  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=function(){cap.type=b.getAttribute("data-type")||"";draw()});
+  document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){scoopCap();cap.size=b.getAttribute("data-size");draw()});
+  document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){scoopCap();cap.source=b.getAttribute("data-src");draw()});
+  document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){scoopCap();cap.owner=b.getAttribute("data-own");draw()});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=function(){scoopCap();cap.delivery=b.getAttribute("data-del");draw()});
+  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=function(){scoopCap();cap.type=b.getAttribute("data-type")||"";draw()});
   const sku=document.getElementById("cap-sku");
-  if(sku) sku.onchange=function(){cap.sku=sku.value;cap.view=0;draw()};
+  if(sku) sku.onchange=function(){scoopCap();cap.sku=sku.value;cap.view=0;draw()};
+  const skuIn=document.getElementById("cap-sku-in");
+  if(skuIn){
+    skuIn.onchange=function(){
+      scoopCap();
+      const p=pickSku(skuIn.value);
+      if(p){cap.sku=p.sku;cap.type=p.look;cap.view=0;draw()}
+    };
+    skuIn.onkeydown=function(e){
+      if(e.key==="Enter"){e.preventDefault();skuIn.blur()}
+    };
+  }
   const capf=document.getElementById("cap");
   if(capf) capf.onsubmit=function(e){
     e.preventDefault();
@@ -677,8 +731,9 @@ function hookDesk(){
       createdAt:Date.now()
     });
     S.leads.unshift(lead);
+    lastCapId=lead.id;
     cap={sku:cap.sku,name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:cap.owner,type:cap.type,colour:"book",view:0,extras:extraFix()};
-    personId=lead.id;tab="clients";save();draw();
+    personId=null;tab="capture";save();toast="On the board.";draw();
   };
   const meet=document.getElementById("meet");
   if(meet) meet.onsubmit=function(e){
@@ -723,6 +778,7 @@ function hookDesk(){
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
+    scoopCap();
     cap.colour=b.getAttribute("data-chide")||"book";
     cap.view=0;
     draw();
@@ -748,6 +804,7 @@ function hookDesk(){
     draw();
   };
   hookExtras("cap",function(){return cap.extras},function(ex,quiet){
+    scoopCap();
     cap.extras=extraFix(ex);
     if(!quiet) draw();
   });
@@ -768,6 +825,7 @@ function hookDesk(){
       return;
     }
     if(tab==="capture"){
+      scoopCap();
       if(abs!=null) cap.view=abs;
       else cap.view=((cap.view||0)+d+n)%n;
       draw();
@@ -789,8 +847,36 @@ function hookDesk(){
     const f=Object.fromEntries(new FormData(pnext));
     const next=String(f.next||"").trim();
     const at=f.at?new Date(f.at).toISOString():null;
-    if(personId){patchLead(personId,{nextAction:next,nextActionAt:at});toast="Next saved.";draw()}
+    const name=String(f.name||"").trim();
+    const phone=String(f.phone||"").trim();
+    const note=String(f.note||"");
+    if(name&&name.length<2){toast="Need a name.";draw();return}
+    if(phone&&digits(phone).length<9){toast="WhatsApp number.";draw();return}
+    if(personId){
+      const fields={nextAction:next,nextActionAt:at,note};
+      if(name) fields.name=name;
+      if(phone) fields.phone=phone;
+      patchLead(personId,fields);
+      toast="Saved.";
+      draw();
+    }
   };
+  document.querySelectorAll("[data-wa]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-wa");
+    const l=S.leads.find(x=>x.id===id);
+    if(l&&(l.status==="new"||l.status==="inbox")){
+      patchLead(id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
+    }
+  }));
+  document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
+    patchLead(b.getAttribute("data-take"),{owner:mySeller()});
+    toast="On this desk.";
+    draw();
+  });
+  if(tab==="capture"&&toast==="On the board."){
+    const n=document.querySelector("#cap [name=name]");
+    if(n) setTimeout(function(){n.focus()},40);
+  }
   const pinfo=document.getElementById("pinfo");
   if(pinfo) pinfo.onsubmit=function(e){
     e.preventDefault();

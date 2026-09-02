@@ -60,6 +60,16 @@ function doDone(tid){
   else patchLead(l.id,{nextAction:it.kind==="size"?"Follow up on the pair":it.step,nextActionAt:new Date(Date.now()+(it.kind==="pay"?12:24)*3600000).toISOString()});
   draw();
 }
+function scoopCap(){
+  const f=document.getElementById("cap");
+  if(!f) return;
+  const d=Object.fromEntries(new FormData(f));
+  if(d.name!=null) cap.name=String(d.name);
+  if(d.phone!=null) cap.phone=String(d.phone);
+  if(d.note!=null) cap.note=String(d.note);
+  const noteEl=document.getElementById("cap-custom");
+  if(noteEl){cap.extras=extraFix(cap.extras);cap.extras.customNote=String(noteEl.value||"").trim()}
+}
 function hookDesk(){
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
@@ -74,13 +84,24 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
-  document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){cap.size=b.getAttribute("data-size");draw()});
-  document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){cap.source=b.getAttribute("data-src");draw()});
-  document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){cap.owner=b.getAttribute("data-own");draw()});
-  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=function(){cap.delivery=b.getAttribute("data-del");draw()});
-  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=function(){cap.type=b.getAttribute("data-type")||"";draw()});
+  document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){scoopCap();cap.size=b.getAttribute("data-size");draw()});
+  document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){scoopCap();cap.source=b.getAttribute("data-src");draw()});
+  document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){scoopCap();cap.owner=b.getAttribute("data-own");draw()});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=function(){scoopCap();cap.delivery=b.getAttribute("data-del");draw()});
+  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=function(){scoopCap();cap.type=b.getAttribute("data-type")||"";draw()});
   const sku=document.getElementById("cap-sku");
-  if(sku) sku.onchange=function(){cap.sku=sku.value;cap.view=0;draw()};
+  if(sku) sku.onchange=function(){scoopCap();cap.sku=sku.value;cap.view=0;draw()};
+  const skuIn=document.getElementById("cap-sku-in");
+  if(skuIn){
+    skuIn.onchange=function(){
+      scoopCap();
+      const p=pickSku(skuIn.value);
+      if(p){cap.sku=p.sku;cap.type=p.look;cap.view=0;draw()}
+    };
+    skuIn.onkeydown=function(e){
+      if(e.key==="Enter"){e.preventDefault();skuIn.blur()}
+    };
+  }
   const capf=document.getElementById("cap");
   if(capf) capf.onsubmit=function(e){
     e.preventDefault();
@@ -101,8 +122,9 @@ function hookDesk(){
       createdAt:Date.now()
     });
     S.leads.unshift(lead);
+    lastCapId=lead.id;
     cap={sku:cap.sku,name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:cap.owner,type:cap.type,colour:"book",view:0,extras:extraFix()};
-    personId=lead.id;tab="clients";save();draw();
+    personId=null;tab="capture";save();toast="On the board.";draw();
   };
   const meet=document.getElementById("meet");
   if(meet) meet.onsubmit=function(e){
@@ -147,6 +169,7 @@ function hookDesk(){
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
+    scoopCap();
     cap.colour=b.getAttribute("data-chide")||"book";
     cap.view=0;
     draw();
@@ -172,6 +195,7 @@ function hookDesk(){
     draw();
   };
   hookExtras("cap",function(){return cap.extras},function(ex,quiet){
+    scoopCap();
     cap.extras=extraFix(ex);
     if(!quiet) draw();
   });
@@ -192,6 +216,7 @@ function hookDesk(){
       return;
     }
     if(tab==="capture"){
+      scoopCap();
       if(abs!=null) cap.view=abs;
       else cap.view=((cap.view||0)+d+n)%n;
       draw();
@@ -213,8 +238,36 @@ function hookDesk(){
     const f=Object.fromEntries(new FormData(pnext));
     const next=String(f.next||"").trim();
     const at=f.at?new Date(f.at).toISOString():null;
-    if(personId){patchLead(personId,{nextAction:next,nextActionAt:at});toast="Next saved.";draw()}
+    const name=String(f.name||"").trim();
+    const phone=String(f.phone||"").trim();
+    const note=String(f.note||"");
+    if(name&&name.length<2){toast="Need a name.";draw();return}
+    if(phone&&digits(phone).length<9){toast="WhatsApp number.";draw();return}
+    if(personId){
+      const fields={nextAction:next,nextActionAt:at,note};
+      if(name) fields.name=name;
+      if(phone) fields.phone=phone;
+      patchLead(personId,fields);
+      toast="Saved.";
+      draw();
+    }
   };
+  document.querySelectorAll("[data-wa]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-wa");
+    const l=S.leads.find(x=>x.id===id);
+    if(l&&(l.status==="new"||l.status==="inbox")){
+      patchLead(id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
+    }
+  }));
+  document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
+    patchLead(b.getAttribute("data-take"),{owner:mySeller()});
+    toast="On this desk.";
+    draw();
+  });
+  if(tab==="capture"&&toast==="On the board."){
+    const n=document.querySelector("#cap [name=name]");
+    if(n) setTimeout(function(){n.focus()},40);
+  }
   const pinfo=document.getElementById("pinfo");
   if(pinfo) pinfo.onsubmit=function(e){
     e.preventDefault();

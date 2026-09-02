@@ -27,7 +27,24 @@
       font-family: var(--font-display); font-size: clamp(2.4rem, 6vw, 4.2rem);
       font-weight: 500; margin: 14px 0 12px; letter-spacing: -.03em; line-height: 1.04;
     }
-    .sub { color: var(--muted); line-height: 1.55; margin: 0 0 8px; max-width: 36em; }
+    .sub { color: var(--muted); line-height: 1.55; margin: 0 0 16px; max-width: 38em; }
+    .how {
+      display: grid; grid-template-columns: 1fr; gap: 8px;
+      margin: 0 0 8px; max-width: 38em;
+    }
+    .how p {
+      margin: 0; display: flex; align-items: center; gap: 10px;
+      color: var(--ink); font-size: 14px; letter-spacing: .01em;
+    }
+    .how span {
+      flex: 0 0 auto; width: 22px; height: 22px;
+      display: grid; place-items: center;
+      border-radius: 50%; border: 1px solid var(--ink);
+      font-size: 11px; font-weight: 600; letter-spacing: 0;
+    }
+    @media (min-width: 720px) {
+      .how { grid-template-columns: repeat(3, auto); gap: 22px; }
+    }
     .chips {
       display: flex; gap: 8px; flex-wrap: wrap; overflow: visible;
       padding: 16px 24px 18px; max-width: 1080px; margin: 0 auto;
@@ -79,7 +96,8 @@
     .tile:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px color-mix(in srgb, #1c1814 12%, transparent), 0 18px 36px color-mix(in srgb, #1c1814 12%, transparent); }
     .tile.on { box-shadow: 0 0 0 2px var(--ink), 0 16px 32px color-mix(in srgb, #1c1814 12%, transparent); }
     .tile img {
-      width: 100%; aspect-ratio: 1; object-fit: cover; background: #1c1814;
+      width: 100%; aspect-ratio: 1; object-fit: cover; object-position: 50% 58%;
+      background: #161310;
       outline: 1px solid color-mix(in srgb, #1c1814 8%, transparent); outline-offset: -1px;
     }
     .tile .pad { padding: 12px 14px 14px; }

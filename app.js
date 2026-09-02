@@ -11,7 +11,18 @@ const EXTRA_FEE=50;
 const SOURCES=[["whatsapp","WhatsApp"],["website","Website"],["instagram","Instagram"],["walk-in","Walk-in"],["referral","Referral"],["other","Other"]];
 const STAGES=[["new","New"],["contacted","Working"],["qualified","Working"],["negotiation","Working"],["closed","Closed"],["lost","Lost"]];
 const RAW=[[1,"Vellie",599,350],[2,"Vellie",649,449],[3,"Vellie",599,399],[4,"Golfer",1200,1000],[5,"Vellie",699,499],[6,"Vellie",599,399],[7,"Vellie",649,449],[8,"Wool-lined boot",799,599],[9,"Wool-lined boot",799,599],[10,"Wool-lined slipper",699,499],[11,"Hiking boot",799,599],[12,"Vellie",649,449],[13,"Derby",599,399],[14,"Derby",799,599],[15,"Chelsea",1100,900],[16,"Vellie",599,399],[17,"Vellie",799,599],[18,"Vellie",699,499],[19,"Vellie",699,499],[20,"Derby",599,399],[21,"Derby",599,399],[22,"Derby",799,599],[23,"Golfer",999,799],[24,"Derby",599,399],[25,"Derby",599,399],[26,"Derby",599,399],[27,"Sandal",449,249],[28,"Thong",449,249],[29,"Thong",449,249],[30,"Sandal",449,249],[31,"Derby",649,449],[32,"Zip boot",899,699],[33,"Derby",599,399],[34,"Derby",599,399],[35,"Derby",599,399],[36,"Vellie",649,449],[37,"Vellie",649,449],[38,"Vellie",649,449],[39,"Chelsea",1100,900],[40,"Chelsea",1100,900],[41,"Derby",649,449],[42,"Derby",599,399],[43,"Loafer",699,499],[44,"Vellie",649,449],[45,"Vellie",699,499],[46,"Vellie",699,499],[47,"Golfer",850,650],[48,"Vellie",699,499],[49,"Thong",449,249],[50,"Vellie",699,499],[51,"Vellie",699,499],[52,"Vellie",699,499],[53,"Vellie",699,499],[54,"Vellie",699,499],[55,"Vellie",649,449],[56,"Hiking boot",799,599],[57,"Wool-lined vellie",799,599],[58,"Vellie",699,499],[59,"Vellie",799,599],[60,"Golfer",1100,900],[61,"Hiking boot",799,599],[62,"Vellie",699,499],[63,"Golfer",1300,1100],[64,"Vellie",699,499],[65,"Combat boot",1400,1200],[66,"Combat boot",1400,1200],[67,"Combat boot",1400,1200],[68,"Combat boot",1200,1000],[69,"Chelsea",1100,900],[70,"Chelsea",1100,900],[71,"Chelsea",1100,900],[72,"Chelsea",1100,900],[73,"Chelsea",1100,900],[74,"Chelsea",1100,900],[75,"Chelsea",1100,900],[76,"Chelsea",1100,900],[77,"Chelsea",1100,900],[78,"Kids vellie",399,199],[79,"Kids derby",399,199],[80,"Hiking boot",1400,1200],[81,"Hiking boot",899,699],[82,"Hiking boot",1400,1200],[83,"Hiking boot",1400,1200],[84,"Hiking boot",1400,1200],[85,"Hiking boot",1400,1200],[86,"Hiking boot",1400,1200],[87,"Vellie",699,499],[88,"Combat boot",1600,1400],[89,"Vellie",699,499],[90,"Golfer",1200,1000],[91,"Zip boot",799,599],[92,"Vellie",699,499]];
-const PAIRS=RAW.map(([n,look,price,cost])=>({n,sku:String(45000+n),look,price,cost,img:PHOTO+(45000+n)+".jpg"}));
+function viewHost(){
+  try{
+    const h=location.hostname||"";
+    if(h.indexOf("vercel.app")>=0) return PHOTO+"views/";
+  }catch(e){}
+  return "./views/";
+}
+function studioOf(sku,n){return viewHost()+sku+"-"+n+".jpg?v=5"}
+const PAIRS=RAW.map(([n,look,price,cost])=>{
+  const sku=String(45000+n);
+  return {n,sku,look,price,cost,img:studioOf(sku,1)};
+});
 function looksOf(){
   const out=[];
   const seen={};
@@ -24,20 +35,10 @@ function matchLook(p,type){return !type||p.look===type}
 function shoe(sku){return PAIRS.find(p=>p.sku===String(sku))||null}
 function hideName(id){const h=HIDES.find(x=>x[0]===id);return h?h[1]:"As photographed"}
 function typeSlug(look){return TYPE_SLUG[look]||"vellie"}
-function viewHost(){
-  try{
-    const h=location.hostname||"";
-    if(h.indexOf("vercel.app")>=0) return PHOTO+"views/";
-  }catch(e){}
-  return "./views/";
-}
-function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=4"}
+function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=5"}
 function viewsOf(p,hide){
   const sku=String(p&&p.sku||"");
-  const studio=[1,2,3,4,5].map(n=>viewHost()+sku+"-"+n+".jpg?v=4");
-  const book=(p&&p.img)||studio[0];
-  if(!hide||hide==="book") return [book].concat(studio.slice(1));
-  return studio;
+  return [1,2,3,4,5].map(n=>studioOf(sku,n));
 }
 function hideSwatch(id){return HIDE_SWATCH[id]||HIDE_SWATCH.book}
 function hideChips(on,attr,short){
@@ -224,7 +225,6 @@ function hookExtras(kind,getEx,setEx){
     setEx(ex,true);
   };
 }
-;
 const KEY="sable-crm-v4";
 const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
@@ -510,7 +510,6 @@ function todoRow(it){
   const go=it.kind==="capture"||it.kind==="fill"?"capture":it.kind==="fit"?"meetings":l?"person":"board";
   return '<div class="todo"><div><p class="name">'+esc(it.step)+'</p><p class="meta">'+who+(extra?" · "+esc(extra):"")+esc(owner)+'</p></div><div class="row">'+(href?'<a class="chip" href="'+href+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="'+go+'" data-id="'+(l?l.id:"")+'">Open</button>'+(l?'<button class="chip on" type="button" data-done="'+esc(it.id)+'">Done</button>':"")+"</div></div>";
 }
-;
 function viewTodo(){
   const items=buildTodos();
   const live=items.filter(i=>i.lane==="live");
@@ -648,7 +647,6 @@ function Desk(){
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
   return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><button class="ghost" type="button" id="out2">Sign out</button></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }
-;
 function draw(){
   const root=document.getElementById("root");
   if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
@@ -984,4 +982,3 @@ async function ingest(){
 draw();
 ingest();
 setInterval(ingest,20000);
-;

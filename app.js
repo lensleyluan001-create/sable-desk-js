@@ -1235,7 +1235,7 @@ function viewInvoice(){
     return "<tr><td><p class=\"name\">"+esc(bits[0]||it.sku)+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+"</p><p class=\"meta\">"+esc(bits.slice(1).join(" · "))+"</p></td><td class=\"num\">"+qty+"</td><td class=\"num\">"+zar(line)+"</td></tr>";
   }).join("");
   const ship="<tr><td><p class=\"name\">"+(t.fee?esc(delLabel(l.delivery)):"Collect")+"</p><p class=\"meta\">"+(t.fee?"Delivery":"No delivery")+"</p></td><td class=\"num\">—</td><td class=\"num\">"+(t.fee?zar(t.fee):"R0")+"</td></tr>";
-  const pay=bank.length?bank.map(function(line){return "<p>"+esc(line)+"</p>";}).join(""):'<p class="meta no-print">Add the house bank in Team so it prints here.</p>';
+  const pay=bank.length?bank.map(function(line){return "<p>"+esc(line)+"</p>";}).join(""):"";
   const bar='<div class="inv-bar no-print">'+
     '<button class="ghost" type="button" data-invback="1">Back</button>'+
     '<button class="solid tight" type="button" id="inv-print">Print / PDF</button>'+

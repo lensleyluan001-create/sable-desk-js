@@ -1228,45 +1228,40 @@ function viewInvoice(){
   const bank=bankLines();
   const issued=invDate(invIssued(l));
   const waPay=wa(l.phone,payMsg(l));
-  const items=(t.items&&t.items.length?t.items:itemsOf(l)).map(function(it){
+  const first=l.name?l.name.split(" ")[0]:"them";
+  const pairs=(t.items&&t.items.length?t.items:itemsOf(l)).map(function(it){
     const ip=shoe(it.sku);
-    const bits=[it.size?("UK "+it.size):"UK size to confirm",hideName(it.colour),extraLabel(it.extras),it.qty>1?("× "+it.qty):""].filter(Boolean);
+    const bits=[it.size?("UK "+it.size):"Size open",hideName(it.colour),extraLabel(it.extras),it.qty>1?("× "+it.qty):""].filter(Boolean);
     const line=Number(it.listed||0)*Number(it.qty||1)+extraSum(it.extras,it.qty||1);
-    return '<div class="inv-item">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div class="inv-ph"></div>')+
-      '<div><p class="name">'+esc(it.sku)+" · "+esc(it.look||"")+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p></div>'+
-      '<p class="inv-amt">'+zar(line)+"</p></div>";
+    return '<div class="m-block inv-pair">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'')+
+      '<p class="kicker">Pair</p><p class="m-num">'+zar(line)+'</p>'+
+      '<p class="name">'+esc(it.sku)+" · "+esc(it.look||"")+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+"</p>"+
+      '<p class="meta">'+esc(bits.join(" · "))+"</p></div>";
   }).join("");
-  const ship=t.fee?('<div class="inv-item inv-plain"><div></div><div><p class="name">'+esc(delLabel(l.delivery))+'</p><p class="meta">Delivery</p></div><p class="inv-amt">'+zar(t.fee)+"</p></div>"):'<div class="inv-item inv-plain"><div></div><div><p class="name">Collect</p><p class="meta">No delivery on this invoice</p></div><p class="inv-amt">R0</p></div>';
-  const pay=bank.length
-    ? bank.map(function(line){return "<p>"+esc(line)+"</p>";}).join("")
-    : '<p>EFT details from Sable with this invoice. Use the reference below.</p>';
-  const stamp=l.paid?'<p class="inv-stamp" aria-hidden="true">Paid</p>':"";
-  const bar='<div class="inv-bar no-print">'+
-    '<button class="ghost" type="button" data-invback="1">Back</button>'+
-    '<button class="solid tight" type="button" id="inv-print">Print / PDF</button>'+
-    (waPay?'<a class="chip on" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'">WhatsApp invoice</a>':'')+
-    '<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+
-    (l.paid?'':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+
+  const acts='<div class="inv-acts no-print">'+
+    (waPay?'<a class="m-block inv-act main" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'"><p class="kicker">1 · Send</p><p class="m-num">WhatsApp</p><p class="meta">To '+esc(first)+"</p></a>":'<div class="m-block"><p class="kicker">1 · Send</p><p class="m-num">No number</p></div>')+
+    '<button class="m-block inv-act" type="button" id="inv-print"><p class="kicker">2 · File</p><p class="m-num">Print</p><p class="meta">Save PDF</p></button>'+
+    '<button class="m-block inv-act" type="button" data-copy="eft"><p class="kicker">3 · Text</p><p class="m-num">Copy EFT</p><p class="meta">'+esc(ref)+"</p></button>"+
+    (l.paid
+      ?'<div class="m-block"><p class="kicker">Paid</p><p class="m-num">Yes</p><p class="meta">EFT is in</p></div>'
+      :'<button class="m-block inv-act" type="button" data-paid="1"><p class="kicker">When they pay</p><p class="m-num">Mark paid</p><p class="meta">Locks the pair</p></button>')+
   "</div>";
-  return '<div class="inv-wrap">'+bar+
-    '<article class="inv-paper">'+stamp+
-      '<header class="inv-top">'+
-        '<div><p class="inv-mark">SABLE</p><p class="inv-place">Johannesburg · Handmade leather</p><p class="inv-place">2026 collection</p></div>'+
-        '<div class="inv-head-right"><p class="inv-kicker">Invoice</p><p class="inv-ref">'+esc(ref)+'</p><p class="inv-place">'+esc(issued)+"</p></div>"+
-      "</header>"+
-      '<div class="inv-who">'+
-        '<div><p class="inv-kicker">Bill to</p><p class="name">'+esc(l.name||"Client")+'</p><p class="meta">'+esc(l.phone||"")+(l.salesman?" · helped by "+esc(l.salesman):"")+"</p></div>"+
-        '<div><p class="inv-kicker">From</p><p class="name">SABLE.CO</p><p class="meta">Johannesburg, South Africa</p></div>'+
-      "</div>"+
-      '<p class="inv-kicker">The pair'+(t.qty>1?"s":"")+"</p>"+
-      '<div class="inv-items">'+items+ship+"</div>"+
-      '<div class="inv-total"><span>EFT due</span><span>'+zar(t.due)+"</span></div>"+
-      '<div class="inv-pay">'+
-        '<div><p class="inv-kicker">Pay by EFT</p>'+pay+'<p class="inv-ref-line">Reference <b>'+esc(ref)+"</b></p></div>"+
-        '<div><p class="inv-kicker">Confirm</p><p>The pair is confirmed when EFT reflects. No card. Handmade. Subject to availability.</p></div>'+
-      "</div>"+
-      '<p class="inv-foot">SABLE.CO · Invoice '+esc(ref)+" · "+esc(issued)+"</p>"+
-    "</article></div>";
+  const nums='<div class="money-grid inv-dash">'+
+    mBlock("EFT due",zar(t.due),issued, "span2")+
+    mBlock("Reference",esc(ref),"Put this on the EFT")+
+    mBlock("To",esc(l.name||"Client"),esc(l.phone||""))+
+    mBlock(t.fee?"Delivery":"Collect",t.fee?zar(t.fee):"R0",esc(delLabel(l.delivery)))+
+    mBlock("From","SABLE","Johannesburg")+
+    pairs+
+    '<div class="m-block span2"><p class="kicker">Pay by EFT</p><p class="m-num">'+esc(ref)+"</p>"+(bank.length?'<p class="meta">'+esc(bank.join(" · "))+"</p>":'<p class="meta">Add the house bank in Team. It prints here.</p>')+"</div>"+
+    mBlock("Confirm","After EFT","Pair is confirmed when it reflects. No card.")+
+  "</div>";
+  return '<div class="inv-wrap">'+
+    '<div class="inv-head no-print"><button class="ghost" type="button" data-invback="1">Back</button></div>'+
+    '<p class="kicker">Invoice · '+esc(ref)+'</p><h1>'+esc(l.name||"Invoice")+"</h1>"+
+    '<p class="sub">Four taps. WhatsApp them the EFT, or print a PDF.</p>'+
+    acts+nums+
+  "</div>";
 }
 function Desk(){
   const body=personId?(invView?viewInvoice():viewPerson()):tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();

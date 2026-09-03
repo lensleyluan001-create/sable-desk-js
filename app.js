@@ -416,6 +416,7 @@ let pane="work";
 let personId=null;
 let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix(),listedPrice:null};
 let pairView=0;
+let invView=false;
 let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
 function setNavOpen(on){
@@ -670,6 +671,15 @@ function bankLines(){
   if(b.branch) lines.push("Branch "+b.branch);
   return lines;
 }
+function invDate(ts){
+  const d=new Date(Number(ts)||Date.now());
+  if(isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"});
+}
+function invIssued(l){
+  const hit=(S.invoices||[]).find(x=>x.leadId===l.id&&x.ref===(l.invRef||invRef(l)));
+  return hit&&hit.at?hit.at:(l.updatedAt||l.createdAt||Date.now());
+}
 function stampInv(l){
   if(!l) return "";
   const ref=invRef(l);
@@ -892,8 +902,9 @@ function todoCta(it){
     return ask+sizes+todoPendBtn(l,it);
   }
   if(it.kind==="pay"){
-    const send=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">'+esc(it.cta)+"</a>":'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
-    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
+    return '<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
+      (href?'<a class="ghost" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp EFT</a>':"")+
+      '<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
   }
   if(href){
     const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
@@ -1165,7 +1176,9 @@ function viewMeetings(){
 function viewTeam(){
   const pending=S.requests.filter(r=>r.status!=="approved"&&r.status!=="denied");
   const rest=S.users.filter(u=>norm(u.email)!==LUAN.email);
-  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p><h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">People</h3>'+S.users.map(u=>'<div class="lead"><p class="name">'+esc(u.name)+'</p><p class="meta">'+esc(u.email)+' · '+esc(u.role)+' · '+(SL[u.seller]||"")+' · '+esc(u.status)+'</p></div>').join("");
+  const b=bankOf();
+  const bank=houseView()?'<h3 style="margin-top:24px">EFT on the invoice</h3><p class="sub">This is what the customer sees. Save it once.</p><form class="card" id="bank"><label>Bank</label><input name="bank" value="'+esc(b.bank)+'" placeholder="Bank name" autocomplete="off" /><label>Account name</label><input name="accountName" value="'+esc(b.accountName)+'" placeholder="Sable" autocomplete="off" /><label>Account number</label><input name="accountNumber" value="'+esc(b.accountNumber)+'" inputmode="numeric" autocomplete="off" /><label>Branch</label><input name="branch" value="'+esc(b.branch)+'" autocomplete="off" /><label>Account type</label><input name="type" value="'+esc(b.type||"Cheque")+'" autocomplete="off" /><button class="solid" type="submit">Save on invoices</button></form>':"";
+  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p><h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">People</h3>'+S.users.map(u=>'<div class="lead"><p class="name">'+esc(u.name)+'</p><p class="meta">'+esc(u.email)+' · '+esc(u.role)+' · '+(SL[u.seller]||"")+' · '+esc(u.status)+'</p></div>').join("")+bank;
 }
 function viewPerson(){
   const l=S.leads.find(x=>x.id===personId);
@@ -1189,7 +1202,7 @@ function viewPerson(){
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card"><div class="line"><span>'+(t.custom?"Custom pair":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+unitListed(l)+'" aria-label="Pair price" /></span></div>'+(p&&t.custom&&unitListed(l)!==p.price?'<div class="line"><span>Book</span><span>'+zar(p.price)+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
-  const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button>'+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);
@@ -1207,8 +1220,56 @@ function viewPerson(){
     '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
     '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(l.nextAction||"")+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
 }
+function viewInvoice(){
+  const l=S.leads.find(x=>x.id===personId);
+  if(!l) return '<p class="empty">Not on Sable.</p><button class="chip" type="button" data-tab="todo">To-do</button>';
+  const t=ticket(l);
+  const ref=l.invRef||invRef(l);
+  const bank=bankLines();
+  const issued=invDate(invIssued(l));
+  const waPay=wa(l.phone,payMsg(l));
+  const items=(t.items&&t.items.length?t.items:itemsOf(l)).map(function(it){
+    const ip=shoe(it.sku);
+    const bits=[it.size?("UK "+it.size):"UK size to confirm",hideName(it.colour),extraLabel(it.extras),it.qty>1?("× "+it.qty):""].filter(Boolean);
+    const line=Number(it.listed||0)*Number(it.qty||1)+extraSum(it.extras,it.qty||1);
+    return '<div class="inv-item">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div class="inv-ph"></div>')+
+      '<div><p class="name">'+esc(it.sku)+" · "+esc(it.look||"")+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p></div>'+
+      '<p class="inv-amt">'+zar(line)+"</p></div>";
+  }).join("");
+  const ship=t.fee?('<div class="inv-item inv-plain"><div></div><div><p class="name">'+esc(delLabel(l.delivery))+'</p><p class="meta">Delivery</p></div><p class="inv-amt">'+zar(t.fee)+"</p></div>"):'<div class="inv-item inv-plain"><div></div><div><p class="name">Collect</p><p class="meta">No delivery on this invoice</p></div><p class="inv-amt">R0</p></div>';
+  const pay=bank.length
+    ? bank.map(function(line){return "<p>"+esc(line)+"</p>";}).join("")
+    : '<p>EFT details from Sable with this invoice. Use the reference below.</p>';
+  const stamp=l.paid?'<p class="inv-stamp" aria-hidden="true">Paid</p>':"";
+  const bar='<div class="inv-bar no-print">'+
+    '<button class="ghost" type="button" data-invback="1">Back</button>'+
+    '<button class="solid tight" type="button" id="inv-print">Print / PDF</button>'+
+    (waPay?'<a class="chip on" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'">WhatsApp invoice</a>':'')+
+    '<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+
+    (l.paid?'':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+
+  "</div>";
+  return '<div class="inv-wrap">'+bar+
+    '<article class="inv-paper">'+stamp+
+      '<header class="inv-top">'+
+        '<div><p class="inv-mark">SABLE</p><p class="inv-place">Johannesburg · Handmade leather</p><p class="inv-place">2026 collection</p></div>'+
+        '<div class="inv-head-right"><p class="inv-kicker">Invoice</p><p class="inv-ref">'+esc(ref)+'</p><p class="inv-place">'+esc(issued)+"</p></div>"+
+      "</header>"+
+      '<div class="inv-who">'+
+        '<div><p class="inv-kicker">Bill to</p><p class="name">'+esc(l.name||"Client")+'</p><p class="meta">'+esc(l.phone||"")+(l.salesman?" · helped by "+esc(l.salesman):"")+"</p></div>"+
+        '<div><p class="inv-kicker">From</p><p class="name">SABLE.CO</p><p class="meta">Johannesburg, South Africa</p></div>'+
+      "</div>"+
+      '<p class="inv-kicker">The pair'+(t.qty>1?"s":"")+"</p>"+
+      '<div class="inv-items">'+items+ship+"</div>"+
+      '<div class="inv-total"><span>EFT due</span><span>'+zar(t.due)+"</span></div>"+
+      '<div class="inv-pay">'+
+        '<div><p class="inv-kicker">Pay by EFT</p>'+pay+'<p class="inv-ref-line">Reference <b>'+esc(ref)+"</b></p></div>"+
+        '<div><p class="inv-kicker">Confirm</p><p>The pair is confirmed when EFT reflects. No card. Handmade. Subject to availability.</p></div>'+
+      "</div>"+
+      '<p class="inv-foot">SABLE.CO · Invoice '+esc(ref)+" · "+esc(issued)+"</p>"+
+    "</article></div>";
+}
 function Desk(){
-  const body=personId?viewPerson():tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
+  const body=personId?(invView?viewInvoice():viewPerson()):tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
   return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }
@@ -1305,16 +1366,60 @@ function hookDesk(){
     toast="Client link copied. Send this: "+u;
     draw();
   };
-  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;invView=false;draw()});
   document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");writeDesk(deskFilter);draw()});
   document.querySelectorAll("[data-col]").forEach(b=>b.onclick=function(){boardCol=b.getAttribute("data-col");draw()});
   document.querySelectorAll("[data-pane]").forEach(b=>b.onclick=function(){pane=b.getAttribute("data-pane");draw()});
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=function(){
     const go=b.getAttribute("data-go");
     const id=b.getAttribute("data-id");
+    invView=false;
     if(go==="person"&&id){personId=id;tab="clients";pairView=0;draw();return}
     tab=go==="person"?"clients":go;personId=null;draw();
   });
+  document.querySelectorAll("[data-invoice]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-invoice");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    stampInv(l);
+    personId=id;
+    invView=true;
+    tab="clients";
+    toast="";
+    draw();
+  });
+  document.querySelectorAll("[data-invback]").forEach(b=>b.onclick=function(){
+    invView=false;
+    draw();
+  });
+  const invPrint=document.getElementById("inv-print");
+  if(invPrint) invPrint.onclick=function(){
+    const l=S.leads.find(x=>x.id===personId);
+    if(l){
+      stampInv(l);
+      patchLead(l.id,{
+        invRef:l.invRef||invRef(l),
+        nextAction:"Invoice sent. Waiting on EFT",
+        nextActionAt:new Date(Date.now()+12*3600000).toISOString(),
+        sitAt:Date.now()
+      });
+    }
+    window.print();
+  };
+  document.querySelectorAll("[data-invsent]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-invsent");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    stampInv(l);
+    setTimeout(function(){
+      patchLead(id,{
+        invRef:l.invRef||invRef(l),
+        nextAction:"Invoice sent. Waiting on EFT",
+        nextActionAt:new Date(Date.now()+12*3600000).toISOString(),
+        sitAt:Date.now()
+      });
+    },400);
+  }));
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
   document.querySelectorAll("[data-pend]").forEach(b=>b.onclick=function(){
     const id=b.getAttribute("data-pend");
@@ -1513,6 +1618,7 @@ function hookDesk(){
     if(!personId) return;
     const l=S.leads.find(x=>x.id===personId);
     if(!l) return;
+    stampInv(l);
     const text=payMsg(l);
     const done=function(){toast="EFT text copied.";draw()};
     if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -1599,6 +1705,21 @@ function hookDesk(){
     save();draw();
   });
   document.querySelectorAll("[data-no]").forEach(b=>b.onclick=function(){const email=b.getAttribute("data-no");const r=S.requests.find(x=>x.email===email);if(r) r.status="denied";save();draw()});
+  const bankf=document.getElementById("bank");
+  if(bankf) bankf.onsubmit=function(e){
+    e.preventDefault();
+    const f=Object.fromEntries(new FormData(bankf));
+    S.bank=Object.assign(emptyBank(),{
+      bank:String(f.bank||"").trim(),
+      accountName:String(f.accountName||"").trim(),
+      accountNumber:String(f.accountNumber||"").trim(),
+      branch:String(f.branch||"").trim(),
+      type:String(f.type||"Cheque").trim()
+    });
+    save();
+    toast="Saved on invoices.";
+    draw();
+  };
 }
 async function ingest(){
   try{

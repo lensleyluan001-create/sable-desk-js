@@ -156,6 +156,7 @@ let pane="work";
 let personId=null;
 let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix(),listedPrice:null};
 let pairView=0;
+let invView=false;
 let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
 function setNavOpen(on){
@@ -410,6 +411,15 @@ function bankLines(){
   if(b.branch) lines.push("Branch "+b.branch);
   return lines;
 }
+function invDate(ts){
+  const d=new Date(Number(ts)||Date.now());
+  if(isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"});
+}
+function invIssued(l){
+  const hit=(S.invoices||[]).find(x=>x.leadId===l.id&&x.ref===(l.invRef||invRef(l)));
+  return hit&&hit.at?hit.at:(l.updatedAt||l.createdAt||Date.now());
+}
 function stampInv(l){
   if(!l) return "";
   const ref=invRef(l);
@@ -632,8 +642,9 @@ function todoCta(it){
     return ask+sizes+todoPendBtn(l,it);
   }
   if(it.kind==="pay"){
-    const send=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">'+esc(it.cta)+"</a>":'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
-    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
+    return '<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
+      (href?'<a class="ghost" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp EFT</a>':"")+
+      '<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
   }
   if(href){
     const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";

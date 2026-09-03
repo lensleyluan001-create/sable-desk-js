@@ -90,16 +90,60 @@ function hookDesk(){
     toast="Client link copied. Send this: "+u;
     draw();
   };
-  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;invView=false;draw()});
   document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");writeDesk(deskFilter);draw()});
   document.querySelectorAll("[data-col]").forEach(b=>b.onclick=function(){boardCol=b.getAttribute("data-col");draw()});
   document.querySelectorAll("[data-pane]").forEach(b=>b.onclick=function(){pane=b.getAttribute("data-pane");draw()});
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=function(){
     const go=b.getAttribute("data-go");
     const id=b.getAttribute("data-id");
+    invView=false;
     if(go==="person"&&id){personId=id;tab="clients";pairView=0;draw();return}
     tab=go==="person"?"clients":go;personId=null;draw();
   });
+  document.querySelectorAll("[data-invoice]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-invoice");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    stampInv(l);
+    personId=id;
+    invView=true;
+    tab="clients";
+    toast="";
+    draw();
+  });
+  document.querySelectorAll("[data-invback]").forEach(b=>b.onclick=function(){
+    invView=false;
+    draw();
+  });
+  const invPrint=document.getElementById("inv-print");
+  if(invPrint) invPrint.onclick=function(){
+    const l=S.leads.find(x=>x.id===personId);
+    if(l){
+      stampInv(l);
+      patchLead(l.id,{
+        invRef:l.invRef||invRef(l),
+        nextAction:"Invoice sent. Waiting on EFT",
+        nextActionAt:new Date(Date.now()+12*3600000).toISOString(),
+        sitAt:Date.now()
+      });
+    }
+    window.print();
+  };
+  document.querySelectorAll("[data-invsent]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-invsent");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    stampInv(l);
+    setTimeout(function(){
+      patchLead(id,{
+        invRef:l.invRef||invRef(l),
+        nextAction:"Invoice sent. Waiting on EFT",
+        nextActionAt:new Date(Date.now()+12*3600000).toISOString(),
+        sitAt:Date.now()
+      });
+    },400);
+  }));
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
   document.querySelectorAll("[data-pend]").forEach(b=>b.onclick=function(){
     const id=b.getAttribute("data-pend");
@@ -298,6 +342,7 @@ function hookDesk(){
     if(!personId) return;
     const l=S.leads.find(x=>x.id===personId);
     if(!l) return;
+    stampInv(l);
     const text=payMsg(l);
     const done=function(){toast="EFT text copied.";draw()};
     if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -384,6 +429,21 @@ function hookDesk(){
     save();draw();
   });
   document.querySelectorAll("[data-no]").forEach(b=>b.onclick=function(){const email=b.getAttribute("data-no");const r=S.requests.find(x=>x.email===email);if(r) r.status="denied";save();draw()});
+  const bankf=document.getElementById("bank");
+  if(bankf) bankf.onsubmit=function(e){
+    e.preventDefault();
+    const f=Object.fromEntries(new FormData(bankf));
+    S.bank=Object.assign(emptyBank(),{
+      bank:String(f.bank||"").trim(),
+      accountName:String(f.accountName||"").trim(),
+      accountNumber:String(f.accountNumber||"").trim(),
+      branch:String(f.branch||"").trim(),
+      type:String(f.type||"Cheque").trim()
+    });
+    save();
+    toast="Saved on invoices.";
+    draw();
+  };
 }
 async function ingest(){
   try{

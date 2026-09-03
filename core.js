@@ -70,7 +70,8 @@ function leadFix(l){
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
     createdAt:l.createdAt||Date.now(),
-    updatedAt:l.updatedAt||l.createdAt||Date.now()
+    updatedAt:l.updatedAt||l.createdAt||Date.now(),
+    sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
   };
 }
 function emptyBank(){return {bank:"",accountName:"",accountNumber:"",branch:"",type:"Cheque"}}
@@ -493,7 +494,7 @@ function deskChips(kind){
   return '<div class="chips" style="margin:14px 0">'+order.map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+(kind==="todo"&&n(id)?" "+n(id):"")+"</button>").join("")+"</div>";
 }
 function sitMs(l){
-  return Math.max(0,Date.now()-(Number(l&&(l.updatedAt||l.createdAt))||Date.now()));
+  return Math.max(0,Date.now()-(Number(l&&(l.sitAt||l.updatedAt||l.createdAt))||Date.now()));
 }
 function sitHeat(ms){
   if(ms<30*60000) return "fresh";
@@ -513,7 +514,9 @@ function sitLabel(ms){
 }
 function todoAge(it){
   const ms=it&&it.wait!=null?it.wait:sitMs(it&&it.lead);
-  return '<span class="todo-age '+sitHeat(ms)+'">'+sitLabel(ms)+"</span>";
+  const heat=sitHeat(ms);
+  const label=heat==="fresh"?"Under 30 min":heat==="warm"?"Over 30 min":"Over 1 hour";
+  return '<span class="todo-age '+heat+'" title="'+esc(label)+'">'+sitLabel(ms)+"</span>";
 }
 function nextTodo(l){
   if(!l||l.status==="lost") return null;
@@ -522,15 +525,12 @@ function nextTodo(l){
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
   const waiting=due>now;
   if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
-  if(l.status==="closed"&&!l.paid){
-    if(waiting) return {kind:"wait",step:"Waiting on the EFT",cta:"Open",done:false,wa:false,lane:"wait"};
-    return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
-  }
-  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   if(waiting){
-    const why=!l.size?"Asked for UK size":!l.paid?"Invoice is out":(l.nextAction||"Waiting on them");
+    const why=l.nextAction||(!l.size?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
   }
+  if(l.status==="closed"&&!l.paid) return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
+  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   if(!l.size){
     const asked=/asked|uk size/i.test(String(l.nextAction||""));
     return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
@@ -629,17 +629,21 @@ function todoCta(it){
   if(it.kind==="size"){
     const ask=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp size</a>':"";
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
-    return ask+sizes;
+    return ask+sizes+todoPendBtn(l,it);
   }
   if(it.kind==="pay"){
     const send=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">'+esc(it.cta)+"</a>":'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
-    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>';
+    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
   }
   if(href){
     const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
-    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>";
+    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>"+todoPendBtn(l,it);
   }
-  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+todoPendBtn(l,it);
+}
+function todoPendBtn(l,it){
+  if(!l||!it||it.kind==="close"||it.kind==="take"||it.lane==="wait") return "";
+  return '<button class="ghost" type="button" data-pend="'+l.id+'">Pend</button>';
 }
 function todoHero(it,nNow){
   const l=it.lead;
@@ -647,16 +651,14 @@ function todoHero(it,nNow){
   const p=shoe(l.sku);
   const img=p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':"<div></div>";
   const of=nNow>1?("Next · 1 of "+nNow):"Next";
-  return '<div class="todo-hero">'+
-    '<p class="kicker">'+of+"</p>"+
+  const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
+  return '<div class="todo-hero '+heat+'">'+
+    '<div class="todo-hero-head"><p class="kicker">'+of+'</p>'+todoAge(it)+"</div>"+
     '<p class="todo-verb">'+esc(todoVerb(it))+"</p>"+
     '<div class="todo-hero-row">'+
       '<div class="todo-shot">'+img+"</div>"+
       '<div class="todo-body">'+
-        '<div class="todo-body-top">'+
-          '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
-          todoAge(it)+
-        "</div>"+
+        '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
         '<p class="meta">'+esc(todoMeta(it))+"</p>"+
       "</div>"+
     "</div>"+
@@ -667,8 +669,9 @@ function todoHero(it,nNow){
 function todoLine(it,n){
   const l=it.lead;
   if(!l) return "";
+  const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
   const num=n!=null?'<span class="todo-ix">'+n+"</span>":'<span class="todo-ix mute"></span>';
-  return '<button class="todo-line" type="button" data-go="person" data-id="'+l.id+'">'+
+  return '<button class="todo-line '+heat+'" type="button" data-go="person" data-id="'+l.id+'">'+
     num+
     '<span class="todo-who">'+
       '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+

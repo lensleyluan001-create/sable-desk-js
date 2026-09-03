@@ -4,22 +4,23 @@ function viewTodo(){
   const wait=items.filter(it=>it.lane==="wait");
   const houseAll=houseView()&&deskFilter==="all";
   const who=houseAll?"Floor":(SL[deskFilter]||SL[mySeller()]||"Your");
-  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" waiting":"");
+  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" pending":"");
   const sub=houseAll
     ?"Unassigned only. Open a name to work that book."
-    :who+"'s book. Only "+who+"'s people.";
-  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo");
+    :who+"'s book. Only "+who+"'s people. Green under 30 min, yellow after that, red over an hour.";
+  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo")+
+    '<p class="todo-key" aria-hidden="true"><span class="todo-age fresh">Under 30 min</span><span class="todo-age warm">Over 30 min</span><span class="todo-age hot">Over 1 hour</span></p>';
   if(!now.length&&!wait.length){
     return '<div class="todo-wrap">'+head+'<div class="todo-clear"><p class="todo-verb">Book is clear</p><p class="meta">Capture if the floor is quiet.</p><button class="solid tight" type="button" data-tab="capture">Capture</button></div></div>';
   }
-  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Waiting on them</p><p class="meta">'+wait.length+" parked. They have not replied yet.</p></div>":"");
+  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Pending</p><p class="meta">'+wait.length+" waiting on them. Timer is still running.</p></div>":"");
   const rest=now.slice(1);
   const up=(!houseAll&&rest.length)?'<p class="kicker todo-then">Up next</p>'+todoQueue(rest,2):"";
-  const waiting=wait.length
-    ?'<details class="todo-park"'+(now.length?"":" open")+"><summary>Waiting on them · "+wait.length+"</summary>"+todoQueue(wait)+"</details>"
+  const pending=wait.length
+    ?'<p class="kicker todo-then">Pending · '+wait.length+"</p>"+todoQueue(wait)
     :"";
   const floor=houseAll?todoBooks():"";
-  return '<div class="todo-wrap">'+head+hero+up+waiting+floor+"</div>";
+  return '<div class="todo-wrap">'+head+hero+up+pending+floor+"</div>";
 }
 function mBlock(kicker,num,meta,cls){
   return '<div class="m-block'+(cls?" "+cls:"")+'"><p class="kicker">'+kicker+'</p><p class="m-num">'+num+"</p>"+(meta?'<p class="meta">'+meta+"</p>":"")+"</div>";

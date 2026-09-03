@@ -257,7 +257,7 @@ function hookExtras(kind,getEx,setEx){
     setEx(ex,true);
   };
 }
-;\n
+;
 const KEY="sable-crm-v4";
 const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
@@ -330,7 +330,8 @@ function leadFix(l){
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
     createdAt:l.createdAt||Date.now(),
-    updatedAt:l.updatedAt||l.createdAt||Date.now()
+    updatedAt:l.updatedAt||l.createdAt||Date.now(),
+    sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
   };
 }
 function emptyBank(){return {bank:"",accountName:"",accountNumber:"",branch:"",type:"Cheque"}}
@@ -753,7 +754,7 @@ function deskChips(kind){
   return '<div class="chips" style="margin:14px 0">'+order.map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+(kind==="todo"&&n(id)?" "+n(id):"")+"</button>").join("")+"</div>";
 }
 function sitMs(l){
-  return Math.max(0,Date.now()-(Number(l&&(l.updatedAt||l.createdAt))||Date.now()));
+  return Math.max(0,Date.now()-(Number(l&&(l.sitAt||l.updatedAt||l.createdAt))||Date.now()));
 }
 function sitHeat(ms){
   if(ms<30*60000) return "fresh";
@@ -773,7 +774,9 @@ function sitLabel(ms){
 }
 function todoAge(it){
   const ms=it&&it.wait!=null?it.wait:sitMs(it&&it.lead);
-  return '<span class="todo-age '+sitHeat(ms)+'">'+sitLabel(ms)+"</span>";
+  const heat=sitHeat(ms);
+  const label=heat==="fresh"?"Under 30 min":heat==="warm"?"Over 30 min":"Over 1 hour";
+  return '<span class="todo-age '+heat+'" title="'+esc(label)+'">'+sitLabel(ms)+"</span>";
 }
 function nextTodo(l){
   if(!l||l.status==="lost") return null;
@@ -782,15 +785,12 @@ function nextTodo(l){
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
   const waiting=due>now;
   if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
-  if(l.status==="closed"&&!l.paid){
-    if(waiting) return {kind:"wait",step:"Waiting on the EFT",cta:"Open",done:false,wa:false,lane:"wait"};
-    return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
-  }
-  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   if(waiting){
-    const why=!l.size?"Asked for UK size":!l.paid?"Invoice is out":(l.nextAction||"Waiting on them");
+    const why=l.nextAction||(!l.size?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
   }
+  if(l.status==="closed"&&!l.paid) return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
+  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   if(!l.size){
     const asked=/asked|uk size/i.test(String(l.nextAction||""));
     return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
@@ -889,17 +889,21 @@ function todoCta(it){
   if(it.kind==="size"){
     const ask=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp size</a>':"";
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
-    return ask+sizes;
+    return ask+sizes+todoPendBtn(l,it);
   }
   if(it.kind==="pay"){
     const send=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">'+esc(it.cta)+"</a>":'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
-    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>';
+    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
   }
   if(href){
     const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
-    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>";
+    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>"+todoPendBtn(l,it);
   }
-  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+todoPendBtn(l,it);
+}
+function todoPendBtn(l,it){
+  if(!l||!it||it.kind==="close"||it.kind==="take"||it.lane==="wait") return "";
+  return '<button class="ghost" type="button" data-pend="'+l.id+'">Pend</button>';
 }
 function todoHero(it,nNow){
   const l=it.lead;
@@ -907,16 +911,14 @@ function todoHero(it,nNow){
   const p=shoe(l.sku);
   const img=p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':"<div></div>";
   const of=nNow>1?("Next · 1 of "+nNow):"Next";
-  return '<div class="todo-hero">'+
-    '<p class="kicker">'+of+"</p>"+
+  const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
+  return '<div class="todo-hero '+heat+'">'+
+    '<div class="todo-hero-head"><p class="kicker">'+of+'</p>'+todoAge(it)+"</div>"+
     '<p class="todo-verb">'+esc(todoVerb(it))+"</p>"+
     '<div class="todo-hero-row">'+
       '<div class="todo-shot">'+img+"</div>"+
       '<div class="todo-body">'+
-        '<div class="todo-body-top">'+
-          '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
-          todoAge(it)+
-        "</div>"+
+        '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
         '<p class="meta">'+esc(todoMeta(it))+"</p>"+
       "</div>"+
     "</div>"+
@@ -927,8 +929,9 @@ function todoHero(it,nNow){
 function todoLine(it,n){
   const l=it.lead;
   if(!l) return "";
+  const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
   const num=n!=null?'<span class="todo-ix">'+n+"</span>":'<span class="todo-ix mute"></span>';
-  return '<button class="todo-line" type="button" data-go="person" data-id="'+l.id+'">'+
+  return '<button class="todo-line '+heat+'" type="button" data-go="person" data-id="'+l.id+'">'+
     num+
     '<span class="todo-who">'+
       '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
@@ -963,29 +966,30 @@ function buildRank(t,l){
   const overdue=t.lane==="now"&&(t.kind==="follow"||t.kind==="pay"||wait>2*86400000);
   return t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:overdue&&t.kind==="pay"?3:t.kind==="size"?4:t.kind==="pay"?5:t.kind==="follow"?6:80;
 }
-;\n
+;
 function viewTodo(){
   const items=buildTodos();
   const now=items.filter(it=>it.lane==="now");
   const wait=items.filter(it=>it.lane==="wait");
   const houseAll=houseView()&&deskFilter==="all";
   const who=houseAll?"Floor":(SL[deskFilter]||SL[mySeller()]||"Your");
-  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" waiting":"");
+  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" pending":"");
   const sub=houseAll
     ?"Unassigned only. Open a name to work that book."
-    :who+"'s book. Only "+who+"'s people.";
-  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo");
+    :who+"'s book. Only "+who+"'s people. Green under 30 min, yellow after that, red over an hour.";
+  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo")+
+    '<p class="todo-key" aria-hidden="true"><span class="todo-age fresh">Under 30 min</span><span class="todo-age warm">Over 30 min</span><span class="todo-age hot">Over 1 hour</span></p>';
   if(!now.length&&!wait.length){
     return '<div class="todo-wrap">'+head+'<div class="todo-clear"><p class="todo-verb">Book is clear</p><p class="meta">Capture if the floor is quiet.</p><button class="solid tight" type="button" data-tab="capture">Capture</button></div></div>';
   }
-  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Waiting on them</p><p class="meta">'+wait.length+" parked. They have not replied yet.</p></div>":"");
+  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Pending</p><p class="meta">'+wait.length+" waiting on them. Timer is still running.</p></div>":"");
   const rest=now.slice(1);
   const up=(!houseAll&&rest.length)?'<p class="kicker todo-then">Up next</p>'+todoQueue(rest,2):"";
-  const waiting=wait.length
-    ?'<details class="todo-park"'+(now.length?"":" open")+"><summary>Waiting on them · "+wait.length+"</summary>"+todoQueue(wait)+"</details>"
+  const pending=wait.length
+    ?'<p class="kicker todo-then">Pending · '+wait.length+"</p>"+todoQueue(wait)
     :"";
   const floor=houseAll?todoBooks():"";
-  return '<div class="todo-wrap">'+head+hero+up+waiting+floor+"</div>";
+  return '<div class="todo-wrap">'+head+hero+up+pending+floor+"</div>";
 }
 function mBlock(kicker,num,meta,cls){
   return '<div class="m-block'+(cls?" "+cls:"")+'"><p class="kicker">'+kicker+'</p><p class="m-num">'+num+"</p>"+(meta?'<p class="meta">'+meta+"</p>":"")+"</div>";
@@ -1188,7 +1192,7 @@ function Desk(){
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
   return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }
-;\n
+;
 function draw(){
   const root=document.getElementById("root");
   if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
@@ -1235,7 +1239,10 @@ function hookGate(){
 function patchLead(id,fields){
   const i=S.leads.findIndex(l=>l.id===id);
   if(i<0) return;
-  S.leads[i]=Object.assign({},S.leads[i],fields,{updatedAt:Date.now()});
+  const prev=S.leads[i];
+  const sitAt=fields.sitAt!=null?fields.sitAt:(prev.sitAt||prev.updatedAt||prev.createdAt);
+  const next=Object.assign({},prev,fields,{updatedAt:Date.now(),sitAt});
+  S.leads[i]=next;
   save();
 }
 function doDone(tid){
@@ -1289,6 +1296,17 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
+  document.querySelectorAll("[data-pend]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-pend");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    patchLead(id,{
+      nextAction:l.nextAction||"Pending",
+      nextActionAt:new Date(Date.now()+2*3600000).toISOString()
+    });
+    toast="Pending. Timer still runs.";
+    draw();
+  });
   document.querySelectorAll("[data-wadone]").forEach(a=>a.addEventListener("click",function(){
     const id=a.getAttribute("data-wadone");
     setTimeout(function(){doDone(id)},500);
@@ -1509,7 +1527,7 @@ function hookDesk(){
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
-    patchLead(b.getAttribute("data-take"),{owner:mySeller()});
+    patchLead(b.getAttribute("data-take"),{owner:mySeller(),sitAt:Date.now()});
     toast="On Sable.";
     draw();
   });

@@ -44,7 +44,10 @@ function hookGate(){
 function patchLead(id,fields){
   const i=S.leads.findIndex(l=>l.id===id);
   if(i<0) return;
-  S.leads[i]=Object.assign({},S.leads[i],fields,{updatedAt:Date.now()});
+  const prev=S.leads[i];
+  const sitAt=fields.sitAt!=null?fields.sitAt:(prev.sitAt||prev.updatedAt||prev.createdAt);
+  const next=Object.assign({},prev,fields,{updatedAt:Date.now(),sitAt});
+  S.leads[i]=next;
   save();
 }
 function doDone(tid){
@@ -98,6 +101,17 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
+  document.querySelectorAll("[data-pend]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-pend");
+    const l=S.leads.find(x=>x.id===id);
+    if(!l) return;
+    patchLead(id,{
+      nextAction:l.nextAction||"Pending",
+      nextActionAt:new Date(Date.now()+2*3600000).toISOString()
+    });
+    toast="Pending. Timer still runs.";
+    draw();
+  });
   document.querySelectorAll("[data-wadone]").forEach(a=>a.addEventListener("click",function(){
     const id=a.getAttribute("data-wadone");
     setTimeout(function(){doDone(id)},500);
@@ -318,7 +332,7 @@ function hookDesk(){
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
-    patchLead(b.getAttribute("data-take"),{owner:mySeller()});
+    patchLead(b.getAttribute("data-take"),{owner:mySeller(),sitAt:Date.now()});
     toast="On Sable.";
     draw();
   });

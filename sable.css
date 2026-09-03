@@ -205,6 +205,18 @@
       margin: 4px 0 8px;
     }
     .todo-hero > .kicker { margin-bottom: 8px; color: var(--ink); }
+    .todo-hero-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .todo-hero-head .kicker { margin: 0; }
+    .todo-hero.fresh { box-shadow: 0 0 0 2px var(--good), var(--shadow); }
+    .todo-hero.warm { box-shadow: 0 0 0 2px var(--warn), var(--shadow); }
+    .todo-hero.hot { box-shadow: 0 0 0 2px var(--hot), var(--shadow); }
+    .todo-key {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 0 0 16px;
+    }
     .todo-verb {
       font-family: var(--font-display);
       font-size: clamp(1.6rem, 4.4vw, 2.15rem);
@@ -232,17 +244,28 @@
     }
     .todo-age {
       display: inline-flex; align-items: center; flex: 0 0 auto;
-      margin: 0; font-size: 12px; font-weight: 600;
-      letter-spacing: .02em; font-variant-numeric: tabular-nums;
-      white-space: nowrap; line-height: 1.2;
+      margin: 0; font-size: 11px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap; line-height: 1;
+      padding: 7px 10px; border-radius: 999px; min-height: 28px;
     }
     .todo-age::before {
       content: ""; width: 8px; height: 8px; border-radius: 50%;
-      margin-right: 6px; background: currentColor; flex: 0 0 auto;
+      margin-right: 7px; background: currentColor; flex: 0 0 auto;
     }
-    .todo-age.fresh { color: var(--good); }
-    .todo-age.warm { color: var(--warn); }
-    .todo-age.hot { color: var(--hot); }
+    .todo-age.fresh {
+      color: var(--good);
+      background: color-mix(in srgb, var(--good) 16%, var(--card));
+    }
+    .todo-age.warm {
+      color: var(--warn);
+      background: color-mix(in srgb, var(--warn) 16%, var(--card));
+    }
+    .todo-age.hot {
+      color: var(--hot);
+      background: color-mix(in srgb, var(--hot) 16%, var(--card));
+    }
     .todo-hero .name {
       font-family: var(--font-body);
       font-size: 17px;
@@ -339,15 +362,19 @@
       gap: 10px;
       align-items: center;
       width: 100%;
-      padding: 12px 14px;
+      padding: 12px 14px 12px 10px;
       min-height: 64px;
       border: 0;
       border-bottom: 1px solid var(--line);
+      border-left: 4px solid var(--line);
       border-radius: 0;
       background: transparent;
       text-align: left;
       color: inherit;
     }
+    .todo-line.fresh { border-left-color: var(--good); }
+    .todo-line.warm { border-left-color: var(--warn); }
+    .todo-line.hot { border-left-color: var(--hot); }
     .todo-line:last-child { border-bottom: 0; }
     .todo-ix {
       width: 28px;

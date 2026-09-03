@@ -60,98 +60,12 @@ function matchSeller(name){
   if(q==="dylan"||q.indexOf("dylan")===0) return "dylan";
   return null;
 }
-function mixHex(hex, other, t){
-  function rgb(h){
-    h=String(h||"").replace("#","");
-    if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
-    return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0];
-  }
-  const a=rgb(hex), b=rgb(other);
-  return "#"+[0,1,2].map(i=>Math.max(0,Math.min(255,Math.round(a[i]+(b[i]-a[i])*t))).toString(16).padStart(2,"0")).join("");
-}
 function xmlEsc(s){
   const amp=String.fromCharCode(38)+"amp;";
   const lt=String.fromCharCode(38)+"lt;";
   const gt=String.fromCharCode(38)+"gt;";
   const qt=String.fromCharCode(38)+"quot;";
   return String(s||"").split(String.fromCharCode(38)).join(amp).split("<").join(lt).split(">").join(gt).split('"').join(qt);
-}
-function laceSvg(color,slug){
-  const id="l"+String(color||"").replace("#","");
-  const dark=mixHex(color,"#1c1814",0.42);
-  const lite=mixHex(color,"#f6f1e8",0.36);
-  const n=/hike|combat|zip/.test(slug)?6:/golfer|derby/.test(slug)?5:4;
-  const xL=35,xR=65,y0=20,y1=78;
-  function pair(i){
-    const t=n===1?0:i/(n-1);
-    const s=1-t*0.2;
-    return [50-(50-xL)*s, y0+t*(y1-y0), 50+(xR-50)*s];
-  }
-  const eyes=[], under=[], over=[];
-  for(let i=0;i<n;i++){
-    const [xl,y,xr]=pair(i);
-    eyes.push(
-      '<g transform="translate('+xl+","+y+')">'+
-        '<ellipse rx="2.7" ry="2" fill="#1a1612"/>'+
-        '<ellipse rx="2.4" ry="1.7" fill="none" stroke="#c4a574" stroke-width="0.7"/>'+
-        '<ellipse rx="1.2" ry="0.85" fill="#0c0a08"/>'+
-        '<ellipse cx="-0.4" cy="-0.4" rx="0.5" ry="0.35" fill="#eadcc488"/>'+
-      "</g>"+
-      '<g transform="translate('+xr+","+y+')">'+
-        '<ellipse rx="2.7" ry="2" fill="#1a1612"/>'+
-        '<ellipse rx="2.4" ry="1.7" fill="none" stroke="#c4a574" stroke-width="0.7"/>'+
-        '<ellipse rx="1.2" ry="0.85" fill="#0c0a08"/>'+
-        '<ellipse cx="-0.4" cy="-0.4" rx="0.5" ry="0.35" fill="#eadcc488"/>'+
-      "</g>"
-    );
-    if(i<n-1){
-      const [xl2,y2,xr2]=pair(i+1);
-      const a="M"+xl+" "+y+" C "+((xl+xr2)/2)+" "+(y+1)+", "+((xl+xr2)/2)+" "+(y2-1)+", "+xr2+" "+y2;
-      const b="M"+xr+" "+y+" C "+((xr+xl2)/2)+" "+(y+1)+", "+((xr+xl2)/2)+" "+(y2-1)+", "+xl2+" "+y2;
-      under.push('<path d="'+a+'" fill="none" stroke="'+dark+'" stroke-width="3.8" stroke-linecap="round"/>');
-      over.push('<path d="'+b+'" fill="none" stroke="url(#'+id+'g)" stroke-width="3.4" stroke-linecap="round"/>');
-      over.push('<path d="'+b+'" fill="none" stroke="'+lite+'" stroke-width="1.05" stroke-linecap="round" transform="translate(-0.55 -0.55)" opacity=".7"/>');
-    }
-  }
-  const bow=
-    '<g filter="url(#'+id+'s)">'+
-      '<ellipse cx="43" cy="16" rx="6.5" ry="3.8" transform="rotate(-26 43 16)" fill="url(#'+id+'g)" stroke="'+dark+'" stroke-width="0.6"/>'+
-      '<ellipse cx="57" cy="16" rx="6.5" ry="3.8" transform="rotate(26 57 16)" fill="url(#'+id+'g)" stroke="'+dark+'" stroke-width="0.6"/>'+
-      '<ellipse cx="50" cy="17.8" rx="2.6" ry="2.1" fill="'+dark+'"/>'+
-      '<ellipse cx="50" cy="17.1" rx="1.6" ry="1.1" fill="'+lite+'" opacity=".55"/>'+
-      '<path d="M48.5 19.5 Q 45 28 46 36" fill="none" stroke="url(#'+id+'g)" stroke-width="2.2" stroke-linecap="round"/>'+
-      '<path d="M51.5 19.5 Q 56 27 54 37" fill="none" stroke="url(#'+id+'g)" stroke-width="2.2" stroke-linecap="round"/>'+
-    "</g>";
-  return '<svg class="fit fit-laces" viewBox="0 0 100 100" aria-hidden="true">'+
-    "<defs>"+
-      '<linearGradient id="'+id+'g" x1="0" y1="0" x2="1" y2="1">'+
-        '<stop offset="0" stop-color="'+lite+'"/>'+
-        '<stop offset=".42" stop-color="'+color+'"/>'+
-        '<stop offset="1" stop-color="'+dark+'"/>'+
-      "</linearGradient>"+
-      '<filter id="'+id+'s" x="-20%" y="-20%" width="140%" height="140%">'+
-        '<feDropShadow dx="0.35" dy="0.8" stdDeviation="0.5" flood-color="#000" flood-opacity=".4"/>'+
-      "</filter>"+
-    "</defs>"+
-    '<g filter="url(#'+id+'s)">'+under.join("")+over.join("")+"</g>"+
-    eyes.join("")+bow+
-  "</svg>";
-}
-function stitchSvg(color,slug){
-  const welt={
-    chelsea:["M12 70 C 8 52, 22 28, 50 22 C 80 16, 98 32, 96 54 C 94 78, 62 90, 22 82","M24 40 C 24 56, 30 70, 42 78","M76 40 C 78 56, 72 72, 60 80"],
-    combat:["M14 76 C 8 54, 16 20, 48 12 C 80 4, 98 22, 96 48 C 96 76, 68 92, 26 88","M30 30 C 40 22, 58 20, 70 30","M28 50 C 40 40, 58 38, 72 50"],
-    hike:["M14 76 C 8 54, 16 20, 48 12 C 80 4, 98 22, 96 48 C 96 76, 68 92, 26 88","M30 30 C 40 22, 58 20, 70 30"],
-    loafer:["M14 70 C 10 52, 22 30, 52 24 C 80 18, 98 34, 94 56 C 92 78, 62 90, 24 82","M32 44 C 44 32, 62 32, 74 46"],
-    golfer:["M14 74 C 10 54, 20 30, 50 24 C 80 16, 98 32, 96 56 C 94 80, 60 92, 22 84","M28 50 C 42 36, 58 34, 72 48"],
-    derby:["M14 74 C 10 54, 20 30, 50 24 C 80 16, 98 32, 96 56 C 94 80, 60 92, 22 84","M28 50 C 42 36, 58 34, 72 48"]
-  };
-  const set=welt[slug]||["M14 72 C 10 54, 20 32, 50 26 C 80 18, 98 34, 96 56 C 94 78, 62 90, 24 84","M26 50 C 40 38, 58 36, 72 48"];
-  const lines=set.map(function(d,i){
-    const w=i===0?1.05:0.8;
-    return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-dasharray="1.25 1.7" stroke-linecap="round"/>';
-  }).join("");
-  return '<svg class="fit fit-stitch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+lines+"</svg>";
 }
 function customTag(note){
   const raw=String(note||"").trim().split(/\n/)[0];
@@ -163,13 +77,8 @@ function customTag(note){
 }
 function extraPaint(p,extras,viewI){
   extras=extraFix(extras);
-  const slug=typeSlug(p&&p.look);
-  const bits=[];
-  if(extras.laces&&lacedLook(p&&p.look)) bits.push(laceSvg(LACE_HEX[extras.laceColour]||LACE_HEX.natural,slug));
-  if(extras.stitch) bits.push(stitchSvg(STITCH_HEX[extras.stitchColour]||STITCH_HEX.cream,slug));
-  if(extras.custom) bits.push(customTag(extras.customNote));
-  if(!bits.length) return "";
-  return '<div class="fit-layer" data-col="'+(extras.laces?extras.laceColour:"")+'">'+bits.join("")+"</div>";
+  if(!extras.custom) return "";
+  return '<div class="fit-layer">'+customTag(extras.customNote)+"</div>";
 }
 function turnHtml(p,hide,viewI,extras){
   hide=hide||"book";
@@ -278,7 +187,7 @@ function extrasHtml(e,look,kind){
     if(kind==="p") html+='<label>Custom amount</label><input id="p-customfee" inputmode="numeric" value="'+(e.customFee||"")+'" placeholder="Quoted ZAR" />';
     else html+='<p class="meta">Custom is quoted. Sable will confirm.</p>';
   }
-  html+='<p class="hint extra-hint">Laser, laces and stitching are R50 each. Custom depends on the work.</p>';
+  html+='<p class="hint extra-hint">Laser, laces and stitching are R50 each. Custom depends on the work. Written on the ticket, not drawn on the photo.</p>';
   return html;
 }
 function shrinkPic(file,done){
@@ -348,8 +257,7 @@ function hookExtras(kind,getEx,setEx){
     setEx(ex,true);
   };
 }
-
-;
+;\n
 const KEY="sable-crm-v4";
 const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
@@ -369,16 +277,43 @@ function digits(p){return String(p||"").replace(/\D/g,"")}
 function wa(phone,text){let d=digits(phone);if(d.length<9)return "";if(d[0]==="0")d="27"+d.slice(1);return "https://wa.me/"+d+(text?"?text="+encodeURIComponent(text):"")}
 function colOf(st){if(st==="new"||st==="inbox")return "new";if(st==="closed")return "closed";if(st==="lost")return "lost";return "working"}
 function splitOf(seller){if(seller==="wian")return {wian:.2,luan:.4,dylan:.3,house:.1};if(seller==="luan")return {wian:0,luan:.6,dylan:.3,house:.1};if(seller==="dylan")return {wian:0,luan:0,dylan:.9,house:.1};return {wian:0,luan:0,dylan:0,house:1}}
+function itemFix(it){
+  it=it&&typeof it==="object"?it:{};
+  const p=shoe(it.sku);
+  const qty=Number(it.qty||1)||1;
+  const extras=extraFix(it.extras);
+  const listedPrice=Number(it.listedPrice)>0?Number(it.listedPrice):null;
+  const listed=listedPrice||(p?p.price:0);
+  return {
+    sku:String(it.sku||""),
+    look:String(it.look||(p&&p.look)||""),
+    size:String(it.size||""),
+    qty,
+    colour:it.colour||"book",
+    extras,
+    listedPrice,
+    listed
+  };
+}
+function itemsOf(l){
+  if(!l) return [];
+  if(Array.isArray(l.items)&&l.items.length) return l.items.map(itemFix);
+  return [itemFix(l)];
+}
 function leadFix(l){
-  const p=shoe(l.sku);
+  const items=itemsOf(l);
+  const first=items[0]||itemFix({});
+  const p=shoe(l.sku||first.sku);
+  const miss=items.some(it=>!it.size);
   return {
     id:l.id||uid(),
     name:String(l.name||"").trim(),
     phone:String(l.phone||"").trim(),
-    sku:String(l.sku||""),
-    look:String(l.look||(p&&p.look)||""),
-    size:String(l.size||""),
-    qty:Number(l.qty||1)||1,
+    sku:String(first.sku||l.sku||""),
+    look:String(first.look||l.look||(p&&p.look)||""),
+    size:miss?"":String(first.size||l.size||""),
+    qty:items.reduce((n,it)=>n+it.qty,0)||1,
+    items,
     source:l.source||"whatsapp",
     status:l.status||(l.stage==="inbox"?"new":l.stage)||"new",
     note:String(l.note||""),
@@ -388,9 +323,9 @@ function leadFix(l){
     paidAmount:Number(l.paidAmount||0)||0,
     delivery:l.delivery||"collect",
     deliveryFee:Number(l.deliveryFee||0)||0,
-    colour:l.colour||"book",
-    extras:extraFix(l.extras),
-    listedPrice:Number(l.listedPrice)>0?Number(l.listedPrice):null,
+    colour:first.colour||l.colour||"book",
+    extras:extraFix(first.extras||l.extras),
+    listedPrice:items.length===1?first.listedPrice:(Number(l.listedPrice)>0?Number(l.listedPrice):null),
     nextAction:l.nextAction||l.next||"",
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
@@ -399,34 +334,77 @@ function leadFix(l){
   };
 }
 function emptyBank(){return {bank:"",accountName:"",accountNumber:"",branch:"",type:"Cheque"}}
-function load(){
-  try{
-    const s=Object.assign({session:null,users:[Object.assign({},LUAN)],requests:[],leads:[],meetings:[],invoices:[],bank:emptyBank()},JSON.parse(localStorage.getItem(KEY)||"null")||{});
-    if(!s.users)s.users=[];
-    if(!s.leads)s.leads=[];
-    if(!s.meetings)s.meetings=[];
-    if(!s.requests)s.requests=[];
-    if(!s.invoices)s.invoices=[];
-    if(!s.bank||typeof s.bank!=="object")s.bank=emptyBank();
-    else s.bank=Object.assign(emptyBank(),s.bank);
-    s.leads=s.leads.map(leadFix);
-    const i=s.users.findIndex(u=>norm(u.email)===LUAN.email);
-    if(i<0)s.users.unshift(Object.assign({},LUAN));
-    else{
-      s.users[i].status="approved";
-      s.users[i].role="admin";
-      s.users[i].name=s.users[i].name||LUAN.name;
-      s.users[i].email=LUAN.email;
-      s.users[i].x=LUAN.x;
-      s.users[i].seller=s.users[i].seller||"luan";
-      if(!s.users[i].password)s.users[i].password=LUAN.password;
-    }
-    return s;
-  }catch(e){
-    return {session:null,users:[Object.assign({},LUAN)],requests:[],leads:[],meetings:[],invoices:[],bank:emptyBank()};
+function keepLeads(list){
+  const byId=new Map();
+  for(const raw of list||[]){
+    if(!raw||typeof raw!=="object") continue;
+    const l=raw.id?raw:leadFix(raw);
+    if(!l||!l.id) continue;
+    const prev=byId.get(l.id);
+    if(!prev){byId.set(l.id,l);continue}
+    const pt=Number(prev.updatedAt||prev.createdAt||0);
+    const nt=Number(l.updatedAt||l.createdAt||0);
+    byId.set(l.id,nt>=pt?Object.assign({},prev,l):Object.assign({},l,prev));
   }
+  return Array.from(byId.values());
 }
-function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+function load(){
+  let s;
+  try{
+    s=Object.assign({session:null,users:[Object.assign({},LUAN)],requests:[],leads:[],meetings:[],invoices:[],bank:emptyBank()},JSON.parse(localStorage.getItem(KEY)||"null")||{});
+  }catch(e){
+    s={session:null,users:[Object.assign({},LUAN)],requests:[],leads:[],meetings:[],invoices:[],bank:emptyBank()};
+  }
+  if(!s.users)s.users=[];
+  if(!s.leads)s.leads=[];
+  if(!s.meetings)s.meetings=[];
+  if(!s.requests)s.requests=[];
+  if(!s.invoices)s.invoices=[];
+  if(!s.bank||typeof s.bank!=="object")s.bank=emptyBank();
+  else s.bank=Object.assign(emptyBank(),s.bank);
+  let extra=[];
+  try{
+    const raw=JSON.parse(localStorage.getItem(KEY+"-leads")||"[]");
+    if(Array.isArray(raw)) extra=raw;
+  }catch(e){}
+  s.leads=keepLeads(s.leads.concat(extra)).map(leadFix);
+  const i=s.users.findIndex(u=>norm(u.email)===LUAN.email);
+  if(i<0)s.users.unshift(Object.assign({},LUAN));
+  else{
+    s.users[i].status="approved";
+    s.users[i].role="admin";
+    s.users[i].name=s.users[i].name||LUAN.name;
+    s.users[i].email=LUAN.email;
+    s.users[i].x=LUAN.x;
+    s.users[i].seller=s.users[i].seller||"luan";
+    if(!s.users[i].password)s.users[i].password=LUAN.password;
+  }
+  return s;
+}
+let vaultTimer=0;
+function vaultPush(){
+  try{
+    clearTimeout(vaultTimer);
+    vaultTimer=setTimeout(function(){
+      fetch(API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({leads:S.leads})}).catch(function(){});
+    },400);
+  }catch(e){}
+}
+function save(){
+  let stored=[];
+  try{
+    const prev=JSON.parse(localStorage.getItem(KEY)||"null");
+    if(prev&&Array.isArray(prev.leads)) stored=prev.leads;
+  }catch(e){}
+  try{
+    const extra=JSON.parse(localStorage.getItem(KEY+"-leads")||"[]");
+    if(Array.isArray(extra)) stored=stored.concat(extra);
+  }catch(e){}
+  S.leads=keepLeads(stored.concat(S.leads)).map(leadFix);
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  try{localStorage.setItem(KEY+"-leads",JSON.stringify(S.leads))}catch(e){}
+  vaultPush();
+}
 let S=load();
 let mode="in";
 let tab="todo";
@@ -452,24 +430,55 @@ function house(){
 }
 function enter(u){
   S.session={email:u.email,name:u.name||LUAN.name,role:u.role||"sales",seller:u.seller||"luan"};
-  toast="";tab="todo";personId=null;save();draw();
+  toast="";tab="todo";personId=null;
+  if(houseView()){
+    const saved=readDesk();
+    deskFilter=SELLERS.indexOf(saved)>=0?saved:(u.seller||"luan");
+    writeDesk(deskFilter);
+  }else deskFilter=u.seller||"luan";
+  save();draw();
 }
 function houseView(){return S.session&&(S.session.role==="admin"||S.session.role==="manager")}
 function mySeller(){return (S.session&&S.session.seller)||"luan"}
 function seeCost(){return S.session&&(S.session.role==="admin"||S.session.role==="manager")}
+const DESK_KEY="sable-desk-v1";
+function readDesk(){
+  try{return localStorage.getItem(DESK_KEY)||""}catch(e){return ""}
+}
+function writeDesk(id){
+  try{localStorage.setItem(DESK_KEY,id||"")}catch(e){}
+}
+function bootDesk(){
+  if(!S.session){deskFilter="all";return}
+  if(!houseView()){deskFilter=mySeller();return}
+  const saved=readDesk();
+  deskFilter=SELLERS.indexOf(saved)>=0?saved:(S.session.seller||"luan");
+}
+bootDesk();
+function bookOf(l){
+  if(!l) return null;
+  if(l.owner&&SELLERS.indexOf(l.owner)>=0) return l.owner;
+  return matchSeller(l.salesman)||null;
+}
 function leads(){
   let rows=S.leads.slice();
-  if(!houseView()) rows=rows.filter(l=>!l.owner||l.owner===mySeller());
-  if(houseView()&&deskFilter!=="all") rows=rows.filter(l=>l.owner===deskFilter||(!l.owner&&deskFilter==="all"));
+  if(!houseView()) rows=rows.filter(l=>bookOf(l)===mySeller());
+  if(houseView()&&deskFilter!=="all") rows=rows.filter(l=>bookOf(l)===deskFilter);
   return rows;
 }
 function firstMsg(l){
   const t=ticket(l);
   const who=l.name?("Hi "+l.name.split(" ")[0]):"Hi";
+  const items=t.items||itemsOf(l);
+  const custom=t.custom?" · Custom":"";
+  if(items.length>1){
+    const lines=items.map(it=>it.sku+" "+it.look+(it.size?(" UK "+it.size):"")+(it.qty>1?(" ×"+it.qty):"")).join("; ");
+    const need=items.some(it=>!it.size);
+    return who+", this is SABLE.CO. "+t.qty+" pairs: "+lines+". Listed "+zar(t.listed)+". Handmade. Subject to availability. "+(need?"Reply with UK size per pair and I will confirm.":"Pair count if more than one and I will confirm.");
+  }
   const size=l.size
     ?("UK "+l.size+" is locked. Pair count if more than one and I will confirm.")
     :"Reply with UK size and pair count and I will confirm.";
-  const custom=isCustomPair(l)?" · Custom":"";
   return who+", this is SABLE.CO. Stock "+(l.sku||"")+" · "+(l.look||"")+custom+" · "+zar(t.listed)+". Handmade. Subject to availability. "+size;
 }
 function feeOf(d){return d==="local"?100:d==="int"?300:0}
@@ -490,20 +499,158 @@ function unitListed(l){
 }
 function isCustomPair(l){
   if(!l) return false;
-  const ex=extraFix(l.extras);
-  if(ex.custom||ex.customFee) return true;
-  const p=shoe(l.sku);
-  const o=Number(l.listedPrice);
-  return !!(p&&o>0&&o!==p.price);
+  return itemsOf(l).some(function(it){
+    const ex=extraFix(it.extras);
+    if(ex.custom||ex.customFee) return true;
+    const p=shoe(it.sku);
+    const o=Number(it.listedPrice);
+    return !!(p&&o>0&&o!==p.price);
+  });
 }
 function nametag(l){return isCustomPair(l)?'<span class="nametag">Custom</span>':""}
 function ticket(l){
-  const p=shoe(l.sku);
-  const qty=Number(l.qty||1)||1;
-  const listed=unitListed(l)*qty;
-  const fee=Number(l.deliveryFee||0)||0;
-  const extras=extraSum(l.extras,qty);
-  return {p,qty,listed,fee,extras,due:listed+fee+extras,custom:isCustomPair(l)};
+  const items=itemsOf(l);
+  const first=items[0]||itemFix(l||{});
+  const p=shoe(first.sku);
+  const qty=items.reduce((n,it)=>n+it.qty,0)||1;
+  const listed=items.reduce((n,it)=>n+Number(it.listed||0)*it.qty,0);
+  const extras=items.reduce((n,it)=>n+extraSum(it.extras,it.qty),0);
+  const fee=Number(l&&l.deliveryFee||0)||0;
+  return {p,qty,listed,fee,extras,due:listed+fee+extras,custom:isCustomPair(l),items};
+}
+function isWebApp(l){
+  const s=String(l&&l.source||"").toLowerCase();
+  return s==="web"||s==="website"||s.indexOf("want")>=0||s.indexOf("lookbook")>=0;
+}
+function pairCostOf(l){
+  return itemsOf(l).reduce(function(n,it){
+    const sp=shoe(it.sku);
+    return n+(((sp&&sp.cost)||0)*Number(it.qty||1));
+  },0);
+}
+function monthKey(ts){
+  const d=new Date(Number(ts)||Date.now());
+  if(isNaN(d.getTime())) return monthKey(Date.now());
+  const m=d.getMonth()+1;
+  return d.getFullYear()+"-"+(m<10?"0"+m:String(m));
+}
+function monthShift(key,n){
+  const parts=String(key||"").split("-");
+  const y=Number(parts[0])||new Date().getFullYear();
+  const m=Number(parts[1])||(new Date().getMonth()+1);
+  const d=new Date(y,m-1+n,1);
+  const mm=d.getMonth()+1;
+  return d.getFullYear()+"-"+(mm<10?"0"+mm:String(mm));
+}
+function monthShort(key){
+  const names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m=Number(String(key).split("-")[1])||1;
+  return names[m-1]||key;
+}
+function pct(n){
+  if(n==null||!isFinite(n)) return "—";
+  return Math.round(n)+"%";
+}
+function tallyMoney(rows){
+  rows=rows||[];
+  const now=Date.now();
+  const thisKey=monthKey(now);
+  const lastKey=monthShift(thisKey,-1);
+  const keys=[];
+  for(let i=11;i>=0;i--) keys.push(monthShift(thisKey,-i));
+  const months=keys.map(function(k){return {key:k,label:monthShort(k),paid:0,pairs:0,apps:0}});
+  const ix={};
+  months.forEach(function(m,i){ix[m.key]=i});
+  let listed=0,accruedProfit=0;
+  let paidRand=0,paidProfit=0,paidPairs=0,paidTickets=0;
+  let apps=0,appsPaid=0,appsPaidPairs=0;
+  let openDue=0,eftDue=0,lostRand=0,invOpen=0;
+  let collectN=0,deliverN=0,customN=0,bookN=0;
+  const src={website:0,whatsapp:0,other:0};
+  const cuts={wian:0,luan:0,dylan:0,house:0};
+  const books={
+    wian:{paid:0,pairs:0,profit:0,apps:0},
+    luan:{paid:0,pairs:0,profit:0,apps:0},
+    dylan:{paid:0,pairs:0,profit:0,apps:0},
+    floor:{paid:0,pairs:0,profit:0,apps:0}
+  };
+  let thisPaid=0,lastPaid=0,thisPairs=0,lastPairs=0,thisApps=0,lastApps=0;
+  const outstanding=[];
+  for(let i=0;i<rows.length;i++){
+    const l=rows[i];
+    const t=ticket(l);
+    const cost=pairCostOf(l);
+    const profit=Math.max(0,t.listed-cost);
+    const created=monthKey(l.createdAt);
+    const paidAt=monthKey(l.updatedAt||l.createdAt);
+    const owner=bookOf(l)||"floor";
+    if(!books[owner]) books[owner]={paid:0,pairs:0,profit:0,apps:0};
+    if(isWebApp(l)){
+      apps++;
+      books[owner].apps++;
+      if(ix[created]!=null) months[ix[created]].apps++;
+      if(created===thisKey) thisApps++;
+      if(created===lastKey) lastApps++;
+      if(l.paid){appsPaid++;appsPaidPairs+=t.qty}
+      src.website++;
+    }else if(String(l.source||"whatsapp").toLowerCase().indexOf("whatsapp")>=0){
+      src.whatsapp++;
+    }else src.other++;
+    if(l.delivery&&l.delivery!=="collect") deliverN++; else collectN++;
+    if(t.custom) customN++; else bookN++;
+    if(l.status==="lost"){
+      lostRand+=t.due;
+      continue;
+    }
+    listed+=t.listed;
+    accruedProfit+=profit;
+    if(l.status!=="closed") openDue+=t.due;
+    if(!l.paid){
+      if(l.invRef){
+        eftDue+=t.due;
+        invOpen++;
+        outstanding.push({id:l.id,name:l.name,sku:l.sku,due:t.due,age:now-(l.updatedAt||l.createdAt||now),owner:owner});
+      }
+    }else{
+      paidRand+=t.due;
+      paidProfit+=profit;
+      paidPairs+=t.qty;
+      paidTickets++;
+      const sp=splitOf(l.owner);
+      cuts.wian+=Math.round(profit*sp.wian);
+      cuts.luan+=Math.round(profit*sp.luan);
+      cuts.dylan+=Math.round(profit*sp.dylan);
+      cuts.house+=Math.round(profit*sp.house);
+      books[owner].paid+=t.due;
+      books[owner].pairs+=t.qty;
+      books[owner].profit+=profit;
+      if(ix[paidAt]!=null){
+        months[ix[paidAt]].paid+=t.due;
+        months[ix[paidAt]].pairs+=t.qty;
+      }
+      if(paidAt===thisKey){thisPaid+=t.due;thisPairs+=t.qty}
+      if(paidAt===lastKey){lastPaid+=t.due;lastPairs+=t.qty}
+    }
+  }
+  outstanding.sort(function(a,b){return b.age-a.age});
+  const live=rows.filter(function(l){return l.status!=="lost"}).length;
+  const conv=apps?(appsPaid/apps)*100:0;
+  const sumMix=apps+paidPairs;
+  const mixApps=sumMix?(apps/sumMix)*100:0;
+  const mixPaid=sumMix?(paidPairs/sumMix)*100:0;
+  const margin=paidRand?(paidProfit/paidRand)*100:0;
+  const avg=paidTickets?(paidRand/paidTickets):0;
+  const closeRate=live?(paidTickets/live)*100:0;
+  const mom=lastPaid?((thisPaid-lastPaid)/lastPaid)*100:(thisPaid?100:0);
+  return {
+    listed,accruedProfit,paidRand,paidProfit,paidPairs,paidTickets,
+    apps,appsPaid,appsPaidPairs,conv,mixApps,mixPaid,
+    openDue,eftDue,lostRand,invOpen,
+    collectN,deliverN,customN,bookN,src,
+    cuts,books,months,thisKey,lastKey,
+    thisPaid,lastPaid,thisPairs,lastPairs,thisApps,lastApps,
+    margin,avg,closeRate,mom,outstanding,live
+  };
 }
 function invRef(l){
   if(l&&l.invRef) return l.invRef;
@@ -542,15 +689,16 @@ function invMsg(l){
   const t=ticket(l);
   const ref=invRef(l);
   const who=l.name?("Hi "+l.name.split(" ")[0]):"Hi";
-  const size=l.size?(" · UK "+l.size):"";
-  const pairs=t.qty>1?(" · "+t.qty+" pairs"):" · 1 pair";
-  const hide=l.colour&&l.colour!=="book"?(" · "+hideName(l.colour)):"";
-  const extras=extraLabel(l.extras);
-  const extraBit=extras?(" · "+extras+(t.extras?(" "+zar(t.extras)):"")):"";
+  const items=t.items||itemsOf(l);
+  const lines=items.map(function(it){
+    const hide=it.colour&&it.colour!=="book"?(" · "+hideName(it.colour)):"";
+    const extras=extraLabel(it.extras);
+    return it.sku+" "+it.look+(it.size?(" · UK "+it.size):"")+(it.qty>1?(" · "+it.qty+" pairs"):" · 1 pair")+hide+(extras?(" · "+extras):"");
+  }).join(". ");
   const custom=t.custom?" Custom pair.":"";
   const ship=t.fee?("Delivery "+zar(t.fee)+" ("+delLabel(l.delivery)+")"):"Collect — no delivery";
   const bank=bankLines();
-  return who+", SABLE.CO invoice "+ref+". "+(l.sku||"")+" "+(l.look||"")+size+pairs+hide+extraBit+"."+custom+" Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from Sable with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT.";
+  return who+", SABLE.CO invoice "+ref+". "+lines+"."+custom+" Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from Sable with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT.";
 }
 function localAt(iso){
   if(!iso) return "";
@@ -562,11 +710,17 @@ function localAt(iso){
 function payMsg(l){return invMsg(l)}
 function sizeMsg(l){
   const who=l.name?("Hi "+l.name.split(" ")[0]):"Hi";
-  return who+", UK size for the "+(l.sku||"")+" "+(l.look||"")+" and I lock it.";
+  const need=itemsOf(l).filter(it=>!it.size);
+  if(need.length>1) return who+", UK size for each pair: "+need.map(it=>it.sku+" "+it.look).join(", ")+" and I lock them.";
+  const it=need[0]||itemsOf(l)[0];
+  return who+", UK size for the "+((it&&it.sku)||l.sku||"")+" "+((it&&it.look)||l.look||"")+" and I lock it.";
 }
 function followMsg(l){
   const who=l.name?("Hi "+l.name.split(" ")[0]):"Hi";
   return who+", checking in on the "+(l.sku||"")+" "+(l.look||"")+". Still want the pair?";
+}
+function clientWebUrl(){
+  return "https://sable-floor.vercel.app/want";
 }
 function Gate(){
   let form="";
@@ -574,7 +728,7 @@ function Gate(){
   else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><label>Who</label><select name="seller"><option value="wian">Wian</option><option value="luan">Luan</option><option value="dylan">Dylan</option></select><button class="solid" type="submit">Send request</button></form>';
   else form='<form class="card" id="signin"><label>Email or X handle</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" required /><label>Password</label><input name="password" type="password" required autocomplete="current-password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
   const title=mode==="reset"?"New password":mode==="ask"?"Request Sable":"Log in";
-  return '<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Luan email is filled in.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+"</div>";
+  return '<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Luan email is filled in.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
 }
 function navBtns(){
   const items=[["todo","To-do","T"],["board","Board","B"],["capture","Capture","C"],["clients","Clients","L"],["meetings","Meetings","M"]];
@@ -584,76 +738,340 @@ function navBtns(){
     return '<button type="button" class="nav-block '+(on?"on":"")+'" data-tab="'+id+'"><span class="nav-mark">'+mark+'</span><span class="nav-name">'+label+"</span></button>";
   }).join("");
 }
-function deskChips(){
+function deskChips(kind){
   if(!houseView()) return "";
-  const n=id=>id==="all"?S.leads.length:S.leads.filter(l=>l.owner===id).length;
-  return '<div class="chips" style="margin:14px 0">'+[["all","Everyone"],...SELLERS.map(s=>[s,SL[s]])].map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+" "+n(id)+"</button>").join("")+"</div>";
+  const n=id=>{
+    if(kind==="todo"){
+      const rows=id==="all"?S.leads.filter(l=>!bookOf(l)):S.leads.filter(l=>bookOf(l)===id);
+      return rows.filter(l=>{const t=nextTodo(l);return t&&t.lane==="now"}).length;
+    }
+    const rows=id==="all"?S.leads:S.leads.filter(l=>bookOf(l)===id);
+    return rows.filter(l=>l.status!=="lost").length;
+  };
+  const mine=mySeller();
+  const order=[[mine,SL[mine]||"You"],...SELLERS.filter(s=>s!==mine).map(s=>[s,SL[s]]),["all","Floor"]];
+  return '<div class="chips" style="margin:14px 0">'+order.map(([id,label])=>'<button class="chip '+(deskFilter===id?"on":"")+'" type="button" data-desk="'+id+'">'+label+(kind==="todo"&&n(id)?" "+n(id):"")+"</button>").join("")+"</div>";
+}
+function sitMs(l){
+  return Math.max(0,Date.now()-(Number(l&&(l.updatedAt||l.createdAt))||Date.now()));
+}
+function sitHeat(ms){
+  if(ms<30*60000) return "fresh";
+  if(ms<60*60000) return "warm";
+  return "hot";
+}
+function sitLabel(ms){
+  const m=Math.floor(ms/60000);
+  if(m<1) return "Just now";
+  if(m===1) return "1 min";
+  if(m<60) return m+" min";
+  const h=Math.floor(m/60);
+  const r=m%60;
+  if(h<48) return r?(h+"h "+r+"m"):(h+"h");
+  const d=Math.round(h/24);
+  return d===1?"1 day":d+" days";
+}
+function todoAge(it){
+  const ms=it&&it.wait!=null?it.wait:sitMs(it&&it.lead);
+  return '<span class="todo-age '+sitHeat(ms)+'">'+sitLabel(ms)+"</span>";
+}
+function nextTodo(l){
+  if(!l||l.status==="lost") return null;
+  if(l.status==="closed"&&l.paid) return null;
+  const now=Date.now();
+  const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
+  const waiting=due>now;
+  if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
+  if(l.status==="closed"&&!l.paid){
+    if(waiting) return {kind:"wait",step:"Waiting on the EFT",cta:"Open",done:false,wa:false,lane:"wait"};
+    return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
+  }
+  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
+  if(waiting){
+    const why=!l.size?"Asked for UK size":!l.paid?"Invoice is out":(l.nextAction||"Waiting on them");
+    return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
+  }
+  if(!l.size){
+    const asked=/asked|uk size/i.test(String(l.nextAction||""));
+    return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
+  }
+  if(!l.paid){
+    const sent=/invoice|eft|pay/i.test(String(l.nextAction||""));
+    return {kind:"pay",step:sent?"Chase the EFT":"Send the invoice",cta:sent?"Chase EFT":"Send invoice",done:true,wa:true,lane:"now"};
+  }
+  return {kind:"follow",step:l.nextAction||"Follow up",cta:"WhatsApp",done:true,wa:true,lane:"now"};
+}
+function todoWaText(it){
+  const l=it&&it.lead;
+  if(!l) return "";
+  if(it.kind==="whatsapp") return firstMsg(l);
+  if(it.kind==="follow") return followMsg(l);
+  if(it.kind==="pay") return invMsg(l);
+  if(it.kind==="size") return sizeMsg(l);
+  return "";
+}
+function todoVerb(it){
+  if(!it) return "";
+  if(it.kind==="close") return "Close the sale";
+  if(it.kind==="take") return "Take this lead";
+  if(it.kind==="whatsapp") return "Send the first WhatsApp";
+  if(it.kind==="size") return /chase/i.test(it.step)?"Chase the size":"Ask for UK size";
+  if(it.kind==="pay") return /chase/i.test(it.step)?"Chase the EFT":"Send the invoice";
+  if(it.kind==="follow") return "Follow up";
+  if(it.kind==="wait") return it.step||"Waiting on them";
+  return it.step||"Open";
+}
+function todoStage(it){
+  if(!it||!it.lead||it.kind==="take") return -1;
+  const l=it.lead;
+  if(it.kind==="close"||(l.paid&&l.status!=="closed")) return 3;
+  if(it.kind==="pay"||l.size) return 2;
+  if(it.kind==="size"||l.status==="contacted"||l.status==="working") return 1;
+  return 0;
+}
+function todoPipe(it){
+  const at=todoStage(it);
+  if(at<0) return "";
+  const steps=["WhatsApp","Size","Invoice","Close"];
+  return '<ol class="todo-pipe" aria-label="Sale steps">'+steps.map((s,i)=>{
+    const st=i<at?"done":i===at?"now":"";
+    return '<li class="'+st+'">'+s+"</li>";
+  }).join("")+"</ol>";
 }
 function buildTodos(){
+  const mine=mySeller();
+  const houseAll=houseView()&&deskFilter==="all";
+  let rows;
+  if(houseView()){
+    if(houseAll) rows=S.leads.filter(l=>!bookOf(l));
+    else rows=S.leads.filter(l=>bookOf(l)===deskFilter);
+  }else{
+    rows=S.leads.filter(l=>bookOf(l)===mine);
+  }
   const now=Date.now();
-  const DAY=86400000;
-  const rows=houseView()?(deskFilter==="all"?S.leads:S.leads.filter(l=>l.owner===deskFilter)):S.leads.filter(l=>!l.owner||l.owner===mySeller());
   const items=[];
   for(const l of rows){
-    if(l.status==="lost") continue;
-    if(l.status==="closed"&&l.paid) continue;
-    if(l.status==="closed"&&!l.paid){items.push({id:"pay-"+l.id,kind:"pay",lane:"live",step:"Chase the EFT",lead:l,due:l.updatedAt});continue}
-    if(l.paid&&l.status!=="closed"){items.push({id:"close-"+l.id,kind:"close",lane:"live",step:"Paid. Close the card",lead:l,due:l.updatedAt});continue}
-    if(l.status==="new"||l.status==="inbox"){items.push({id:"wa-"+l.id,kind:"whatsapp",lane:"live",step:"Send the first WhatsApp",lead:l,due:l.createdAt});continue}
-    if(!l.size){items.push({id:"sz-"+l.id,kind:"size",lane:"live",step:"Lock the UK size",lead:l,due:l.updatedAt});continue}
-    if(l.size&&!l.paid){items.push({id:"inv-"+l.id,kind:"pay",lane:"live",step:"Send the invoice · "+invRef(l),lead:l,due:l.updatedAt});continue}
-    const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
-    const stale=now-(l.updatedAt||l.createdAt)>DAY;
-    if(due&&due>now) continue;
-    if(!due&&!stale) continue;
-    items.push({id:"fl-"+l.id,kind:"follow",lane:"live",step:l.nextAction||"Follow up on the pair",lead:l,due:due||l.updatedAt});
+    let t=nextTodo(l);
+    if(!t) continue;
+    if(houseAll&&t.lane==="now") t={kind:"take",step:"Not on a book yet.",cta:"Take",done:false,wa:false,lane:"now"};
+    const wait=sitMs(l);
+    const overdue=t.lane==="now"&&(t.kind==="follow"||t.kind==="pay"||wait>2*86400000);
+    const rank=t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:overdue&&t.kind==="pay"?3:t.kind==="size"?4:t.kind==="pay"?5:t.kind==="follow"?6:t.lane==="wait"?80:9;
+    items.push({
+      id:t.kind+"-"+l.id,
+      kind:t.kind,
+      step:t.step,
+      cta:t.cta,
+      done:t.done,
+      wa:t.wa,
+      lane:t.lane||"now",
+      lead:l,
+      due:l.nextActionAt||l.updatedAt||l.createdAt,
+      overdue:!!overdue,
+      wait,
+      rank
+    });
   }
-  const desks=houseView()?SELLERS:[mySeller()];
-  const today=new Date();today.setHours(0,0,0,0);const t0=today.getTime();
-  for(const d of desks){
-    const mine=S.leads.filter(l=>l.owner===d);
-    const open=mine.filter(l=>l.status!=="closed"&&l.status!=="lost");
-    const capturedToday=mine.filter(l=>(l.createdAt||0)>=t0).length;
-    if(houseView()&&open.length===0) items.push({id:"fill-"+d,kind:"fill",lane:"second",step:"Fill this book",detail:"No open people on Sable.",owner:d,lead:null});
-    else if(capturedToday===0) items.push({id:"cap-"+d,kind:"capture",lane:"second",step:"Capture someone today",detail:"Empty morning. Put a name on the board.",owner:d,lead:null});
-    const paid=mine.filter(l=>l.status==="closed"&&l.paid).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-    const ref=paid.find(l=>{const age=now-(l.updatedAt||0);return age>5*DAY&&age<120*DAY&&!/who else/i.test(l.nextAction||"")});
-    if(ref) items.push({id:"ref-"+ref.id,kind:"referral",lane:"second",step:"Ask who else wants a pair",lead:ref,owner:d});
-    const nxt=paid.find(l=>{const age=now-(l.updatedAt||0);return (!ref||l.id!==ref.id)&&age>21*DAY&&age<90*DAY&&!/next pair/i.test(l.nextAction||"")});
-    if(nxt) items.push({id:"nxt-"+nxt.id,kind:"next",lane:"second",step:"Offer the next pair",lead:nxt,owner:d});
-    const week=now+7*DAY;
-    const fits=S.meetings.filter(m=>{const t=new Date(m.at).getTime();return t>=now&&t<=week});
-    if(fits.length===0) items.push({id:"fit-"+d,kind:"fit",lane:"second",step:"Book a fit this week",detail:"A name in the diary. Collect or try-on.",owner:d,lead:null});
-  }
+  items.sort((a,b)=>a.rank-b.rank||b.wait-a.wait);
   return items;
 }
-function todoRow(it){
+function todoMeta(it){
   const l=it.lead;
-  const who=l?esc(l.name):esc(it.detail||"");
-  const extra=l?[l.sku,l.look,l.size?("UK "+l.size):"",l.invRef||""].filter(Boolean).join(" · "):"";
-  const owner=houseView()&&(l&&l.owner||it.owner)?" · "+SL[l&&l.owner||it.owner]:"";
-  const href=l?wa(l.phone,it.kind==="whatsapp"?firstMsg(l):it.kind==="follow"?followMsg(l):it.kind==="pay"?invMsg(l):it.kind==="size"?sizeMsg(l):it.kind==="referral"?("Hi "+(l.name.split(" ")[0]||"")+", the "+l.sku+" "+l.look+" is with you. Anyone else who wants a pair — send them my way."):it.kind==="next"?("Hi "+(l.name.split(" ")[0]||"")+", the "+l.sku+" "+l.look+" should be worn in. Next pair when you are ready."):""):"";
-  const go=it.kind==="capture"||it.kind==="fill"?"capture":it.kind==="fit"?"meetings":l?"person":"board";
-  return '<div class="todo"><div><p class="name">'+esc(it.step)+'</p><p class="meta">'+who+(extra?" · "+esc(extra):"")+esc(owner)+'</p></div><div class="row">'+(href?'<a class="chip" href="'+href+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="'+go+'" data-id="'+(l?l.id:"")+'">Open</button>'+(l?'<button class="chip on" type="button" data-done="'+esc(it.id)+'">Done</button>':"")+"</div></div>";
+  const t=ticket(l);
+  return [t.qty>1?(t.qty+" pairs"):"", l.sku, l.look, l.size?("UK "+l.size):""].filter(Boolean).join(" · ");
 }
-
-;
+function todoCta(it){
+  const l=it.lead;
+  if(!l) return "";
+  const href=it.wa?wa(l.phone,todoWaText(it)):"";
+  if(it.kind==="close") return '<button class="solid tight" type="button" data-done="'+esc(it.id)+'">Mark closed</button>';
+  if(it.kind==="take") return '<button class="solid tight" type="button" data-take="'+l.id+'">Take onto my book</button>';
+  if(it.kind==="size"){
+    const ask=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp size</a>':"";
+    const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
+    return ask+sizes;
+  }
+  if(it.kind==="pay"){
+    const send=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">'+esc(it.cta)+"</a>":'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+    return send+'<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>';
+  }
+  if(href){
+    const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
+    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>";
+  }
+  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+}
+function todoHero(it,nNow){
+  const l=it.lead;
+  if(!l) return "";
+  const p=shoe(l.sku);
+  const img=p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':"<div></div>";
+  const of=nNow>1?("Next · 1 of "+nNow):"Next";
+  return '<div class="todo-hero">'+
+    '<p class="kicker">'+of+"</p>"+
+    '<p class="todo-verb">'+esc(todoVerb(it))+"</p>"+
+    '<div class="todo-hero-row">'+
+      '<div class="todo-shot">'+img+"</div>"+
+      '<div class="todo-body">'+
+        '<div class="todo-body-top">'+
+          '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
+          todoAge(it)+
+        "</div>"+
+        '<p class="meta">'+esc(todoMeta(it))+"</p>"+
+      "</div>"+
+    "</div>"+
+    todoPipe(it)+
+    todoCta(it)+
+  "</div>";
+}
+function todoLine(it,n){
+  const l=it.lead;
+  if(!l) return "";
+  const num=n!=null?'<span class="todo-ix">'+n+"</span>":'<span class="todo-ix mute"></span>';
+  return '<button class="todo-line" type="button" data-go="person" data-id="'+l.id+'">'+
+    num+
+    '<span class="todo-who">'+
+      '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
+      '<p class="todo-step">'+esc(todoVerb(it))+"</p>"+
+      '<p class="meta">'+esc(todoMeta(it))+"</p>"+
+    "</span>"+
+    todoAge(it)+
+  "</button>";
+}
+function todoQueue(items,start){
+  if(!items.length) return "";
+  return '<div class="todo-queue">'+items.map((it,i)=>todoLine(it,start==null?null:start+i)).join("")+"</div>";
+}
+function todoBooks(){
+  if(!houseView()||deskFilter!=="all") return "";
+  const bits=SELLERS.map(s=>{
+    const rows=S.leads.filter(l=>bookOf(l)===s);
+    const nows=rows.map(l=>({l:l,t:nextTodo(l)})).filter(x=>x.t&&x.t.lane==="now");
+    nows.sort((a,b)=>buildRank(a.t,a.l)-buildRank(b.t,b.l));
+    const next=nows[0];
+    const line=next?(todoVerb({kind:next.t.kind,step:next.t.step})+" · "+(next.l.name||"No name")):"Clear";
+    return '<button class="todo-book" type="button" data-desk="'+s+'">'+
+      '<span class="name">'+SL[s]+'</span>'+
+      '<span class="todo-n">'+(nows.length?nows.length+" to do":"Clear")+"</span>"+
+      '<span class="meta">'+esc(line)+"</span>"+
+    "</button>";
+  }).join("");
+  return '<p class="kicker todo-then">Open a book</p><div class="todo-books">'+bits+"</div>";
+}
+function buildRank(t,l){
+  const wait=Date.now()-(l.updatedAt||l.createdAt||Date.now());
+  const overdue=t.lane==="now"&&(t.kind==="follow"||t.kind==="pay"||wait>2*86400000);
+  return t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:overdue&&t.kind==="pay"?3:t.kind==="size"?4:t.kind==="pay"?5:t.kind==="follow"?6:80;
+}
+;\n
 function viewTodo(){
   const items=buildTodos();
-  const live=items.filter(i=>i.lane==="live");
-  const second=items.filter(i=>i.lane==="second");
-  function stack(list,lane){
-    if(!houseView()||deskFilter!=="all") return list.map(todoRow).join("")||'<p class="empty">Nothing here.</p>';
-    let html="";
-    const loose=list.filter(i=>(i.lead?i.lead.owner:i.owner)==null);
-    if(loose.length) html+='<div class="desk-block"><h4>Unassigned</h4>'+loose.map(todoRow).join("")+"</div>";
-    for(const s of SELLERS){
-      const rows=list.filter(i=>(i.lead?i.lead.owner:i.owner)===s);
-      html+='<div class="desk-block"><div class="spread"><h4>'+SL[s]+'</h4><p class="meta">'+rows.length+'</p></div>'+(rows.length?rows.map(todoRow).join(""):'<p class="empty">Clear.</p>')+"</div>";
-    }
-    return html;
+  const now=items.filter(it=>it.lane==="now");
+  const wait=items.filter(it=>it.lane==="wait");
+  const houseAll=houseView()&&deskFilter==="all";
+  const who=houseAll?"Floor":(SL[deskFilter]||SL[mySeller()]||"Your");
+  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" waiting":"");
+  const sub=houseAll
+    ?"Unassigned only. Open a name to work that book."
+    :who+"'s book. Only "+who+"'s people.";
+  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo");
+  if(!now.length&&!wait.length){
+    return '<div class="todo-wrap">'+head+'<div class="todo-clear"><p class="todo-verb">Book is clear</p><p class="meta">Capture if the floor is quiet.</p><button class="solid tight" type="button" data-tab="capture">Capture</button></div></div>';
   }
-  return '<p class="kicker">CRM</p><h1>To-do</h1><p class="sub">'+(houseView()?"Live is the pair in hand. Second is how the house grows. Everyone under Wian, Luan, Dylan.":"Live is your open people. Second is how you fill tomorrow — capture, ask, book a fit.")+"</p>"+deskChips()+'<details class="card"><summary>Live · capture to paid</summary><ol><li><span>1</span><div><p>Capture</p><p class="meta">Name, WhatsApp, the 45xxx. On the board the same minute.</p></div></li><li><span>2</span><div><p>First message</p><p class="meta">Stock, type, listed. Ask UK size. Do not discount.</p></div></li><li><span>3</span><div><p>Lock the pair</p><p class="meta">Size, hide, collect or send.</p></div></li><li><span>4</span><div><p>Invoice</p><p class="meta">EFT before the pair is confirmed.</p></div></li><li><span>5</span><div><p>Follow up</p><p class="meta">One chase if they ghost after price. Then lost.</p></div></li></ol></details><div class="lane"><p class="kicker">Live</p><h3>On the pair now</h3><p class="meta">WhatsApp, size, EFT, close.</p>'+(live.length?stack(live,"live"):'<p class="empty">Nothing here.</p>')+'</div><div class="lane"><p class="kicker">Second</p><h3>Fill the book</h3><p class="meta">Capture, ask, book a fit. Tomorrow\'s money.</p>'+stack(second,"second")+"</div>";
+  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Waiting on them</p><p class="meta">'+wait.length+" parked. They have not replied yet.</p></div>":"");
+  const rest=now.slice(1);
+  const up=(!houseAll&&rest.length)?'<p class="kicker todo-then">Up next</p>'+todoQueue(rest,2):"";
+  const waiting=wait.length
+    ?'<details class="todo-park"'+(now.length?"":" open")+"><summary>Waiting on them · "+wait.length+"</summary>"+todoQueue(wait)+"</details>"
+    :"";
+  const floor=houseAll?todoBooks():"";
+  return '<div class="todo-wrap">'+head+hero+up+waiting+floor+"</div>";
+}
+function mBlock(kicker,num,meta,cls){
+  return '<div class="m-block'+(cls?" "+cls:"")+'"><p class="kicker">'+kicker+'</p><p class="m-num">'+num+"</p>"+(meta?'<p class="meta">'+meta+"</p>":"")+"</div>";
+}
+function moneyChart(months,thisKey){
+  const w=720,h=220,padL=4,padR=4,padT=18,padB=36;
+  const max=Math.max.apply(null,months.map(function(m){return m.paid}).concat([1]));
+  const inner=w-padL-padR;
+  const gap=7;
+  const bw=(inner-(months.length-1)*gap)/months.length;
+  const bars=months.map(function(m,i){
+    const x=padL+i*(bw+gap);
+    const bh=Math.max(m.paid?6:2,(m.paid/max)*(h-padT-padB));
+    const y=h-padB-bh;
+    const now=m.key===thisKey?" now":"";
+    const op=m.paid?"":" faint";
+    return '<g class="m-col'+now+op+'"><rect class="bar" x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="5"><title>'+esc(m.label)+" · "+zar(m.paid)+" · "+m.pairs+" pairs</title></rect><text x='"+(x+bw/2)+"' y='"+(h-12)+"' text-anchor='middle'>"+esc(m.label)+"</text></g>";
+  }).join("");
+  return '<div class="m-chart card span2"><div class="spread"><p class="kicker">Sales each month</p><p class="meta">Paid rand · last 12 months · peak '+zar(max)+"</p></div><svg class='m-svg' viewBox='0 0 "+w+" "+h+"' role='img' aria-label='Paid sales by month'>"+bars+"</svg></div>";
+}
+function moneyRatio(m){
+  const a=Math.max(0,Math.min(100,m.mixApps));
+  const p=Math.max(0,Math.min(100,m.mixPaid));
+  return '<div class="m-block span2 m-ratio">'+
+    '<p class="kicker">Apps in · shoes paid out</p>'+
+    '<div class="m-ratio-row">'+
+      '<div><p class="m-num">'+m.apps+'</p><p class="meta">Apps in</p></div>'+
+      '<div class="m-ratio-mid"><p class="m-num">'+pct(m.conv)+'</p><p class="meta">of apps paid</p></div>'+
+      '<div class="m-ratio-end"><p class="m-num">'+m.paidPairs+'</p><p class="meta">Pairs paid</p></div>'+
+    "</div>"+
+    '<div class="m-bar" aria-hidden="true"><i style="width:'+a+'%"></i><i class="gold" style="width:'+p+'%"></i></div>'+
+    '<p class="meta">'+pct(a)+" of this mix is website apps · "+pct(p)+" is pairs paid. "+m.appsPaid+" of "+m.apps+" lookbook apps have paid"+(m.appsPaidPairs?" · "+m.appsPaidPairs+" pairs":"")+".</p>"+
+  "</div>";
+}
+function moneyMix(label,parts){
+  const total=parts.reduce(function(n,p){return n+p.n},0)||1;
+  const rows=parts.map(function(p){
+    const w=Math.round((p.n/total)*100);
+    return '<div class="m-mix-row"><span>'+esc(p.label)+'</span><b>'+p.n+'</b><span class="m-mini"><i style="width:'+w+'%"></i></span><span>'+w+"%</span></div>";
+  }).join("");
+  return '<div class="m-block"><p class="kicker">'+esc(label)+"</p>"+rows+"</div>";
+}
+function viewMoney(rows){
+  const m=tallyMoney(rows);
+  const who=deskFilter==="all"?"House":((SL[deskFilter]||"This")+"'s book");
+  const mom=m.mom>0?("+"+Math.round(m.mom)+"% vs last"):(m.mom<0?(Math.round(m.mom)+"% vs last"):"Flat vs last");
+  const head='<p class="kicker">CRM · Money</p><div class="spread"><h1>Board</h1><div class="row"><button class="chip" type="button" data-pane="work">Work</button><button class="chip on" type="button" data-pane="money">Money</button><button class="chip" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+
+    '<p class="sub">'+esc(who)+". Numbers in blocks. Website apps against pairs that paid. Graph is cash in the door, by month.</p>";
+  const top='<div class="money-grid">'+
+    mBlock("Cash in",zar(m.paidRand),m.paidTickets+" paid · "+m.paidPairs+" pairs")+
+    mBlock("This month",zar(m.thisPaid),mom+" · "+m.thisPairs+" pairs")+
+    mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" invoice"+(m.invOpen===1?"":"s")+" out"):"None waiting",m.eftDue?" warn":"")+
+    mBlock("Pair profit",zar(m.paidProfit),"On paid · margin "+pct(m.margin))+
+    "</div>";
+  const mid='<div class="money-grid">'+
+    moneyRatio(m)+
+    mBlock("Apps in",String(m.apps),m.thisApps+" this month · lookbook")+
+    mBlock("Shoes paid",String(m.paidPairs),m.appsPaidPairs+" of them from the site")+
+    mBlock("Average ticket",zar(Math.round(m.avg)),m.paidTickets+" closed tickets")+
+    mBlock("Close rate",pct(m.closeRate),m.paidTickets+" paid of "+m.live+" live")+
+    "</div>";
+  const cuts='<p class="kicker money-h">Cuts on paid</p><div class="money-grid">'+
+    mBlock("Wian",zar(m.cuts.wian),"Share of pair profit")+
+    mBlock("Luan",zar(m.cuts.luan),"Share of pair profit")+
+    mBlock("Dylan",zar(m.cuts.dylan),"Share of pair profit")+
+    mBlock("House",zar(m.cuts.house),"Share of pair profit")+
+    "</div>";
+  const bookKeys=[["luan","Luan"],["dylan","Dylan"],["wian","Wian"],["floor","Floor"]];
+  const bookBlocks=bookKeys.map(function(pair){
+    const b=m.books[pair[0]]||{paid:0,pairs:0,profit:0,apps:0};
+    return mBlock(pair[1],zar(b.paid),b.pairs+" pairs · profit "+zar(b.profit)+(b.apps?" · "+b.apps+" apps":""));
+  }).join("");
+  const books='<p class="kicker money-h">By book</p><div class="money-grid">'+bookBlocks+"</div>";
+  const mix='<p class="kicker money-h">Mix</p><div class="money-grid">'+
+    moneyMix("Source",[{label:"Website",n:m.src.website},{label:"WhatsApp",n:m.src.whatsapp},{label:"Other",n:m.src.other}])+
+    moneyMix("How they take it",[{label:"Collect",n:m.collectN},{label:"Delivery",n:m.deliverN}])+
+    moneyMix("Pair",[{label:"Book",n:m.bookN},{label:"Custom",n:m.customN}])+
+    mBlock("Still open",zar(m.openDue),"Listed on the floor · lost "+zar(m.lostRand))+
+    "</div>";
+  const wait=m.outstanding.length
+    ? m.outstanding.slice(0,8).map(function(o){
+        return '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>";
+      }).join("")
+    : '<p class="meta">None waiting.</p>';
+  const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
+  return head+'<div class="money-dash">'+top+mid+moneyChart(m.months,m.thisKey)+cuts+books+mix+out+"</div>";
 }
 function viewBoard(){
   const rows=leads();
@@ -669,24 +1087,11 @@ function viewBoard(){
     const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
+    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([t.qty>1?(t.qty+" pairs"):"",l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
   }
-  if(pane==="money"&&seeCost()){
-    let listed=0,profit=0,cuts={wian:0,luan:0,dylan:0,house:0};
-    const lines=rows.filter(l=>l.status!=="lost").map(l=>{
-      const p=shoe(l.sku)||{price:0,cost:0};
-      const t=ticket(l);
-      const q=t.qty;
-      const L=t.listed,C=(p.cost||0)*q,pr=Math.max(0,L-C);
-      listed+=L;profit+=pr;
-      const sp=splitOf(l.owner);
-      cuts.wian+=Math.round(pr*sp.wian);cuts.luan+=Math.round(pr*sp.luan);cuts.dylan+=Math.round(pr*sp.dylan);cuts.house+=Math.round(pr*sp.house);
-      return '<div class="line"><span>'+esc(l.name)+' · '+esc(l.sku)+'</span><span>'+zar(L)+(seeCost()?" · "+zar(pr):"")+'</span></div>';
-    }).join("");
-    return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row"><button class="chip" type="button" data-pane="work">Work</button><button class="chip on" type="button" data-pane="money">Money</button><button class="chip on" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+'<div class="money card"><div class="line"><span>Listed</span><span>'+zar(listed)+'</span></div><div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div><div class="line"><span>Wian</span><span>'+zar(cuts.wian)+'</span></div><div class="line"><span>Luan</span><span>'+zar(cuts.luan)+'</span></div><div class="line"><span>Dylan</span><span>'+zar(cuts.dylan)+'</span></div><div class="line"><span>House</span><span>'+zar(cuts.house)+'</span></div></div><div class="money" style="margin-top:18px">'+lines+'</div>';
-  }
+  if(pane==="money"&&seeCost()) return viewMoney(rows);
   const colHtml=cols.map(([id,label])=>'<section><p class="kicker">'+label+' · '+grouped[id].length+'</p>'+(grouped[id].map(card).join("")||'<p class="empty">Clear.</p>')+"</section>").join("");
-  return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row">'+(seeCost()?'<button class="chip on" type="button" data-pane="work">Work</button><button class="chip" type="button" data-pane="money">Money</button>':"")+'<button class="chip on" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+metrics+'<div class="chips" style="margin:0 0 12px">'+cols.map(([id,label])=>'<button class="chip '+(boardCol===id?"on":"")+'" type="button" data-col="'+id+'">'+label+' '+grouped[id].length+'</button>').join("")+'</div><div class="board desktop-only">'+colHtml+'</div><div class="phone-cols">'+grouped[boardCol].map(card).join("")+'</div>';
+  return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row">'+(seeCost()?'<button class="chip on" type="button" data-pane="work">Work</button><button class="chip" type="button" data-pane="money">Money</button>':"")+'<button class="chip" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+metrics+'<div class="chips" style="margin:0 0 12px">'+cols.map(([id,label])=>'<button class="chip '+(boardCol===id?"on":"")+'" type="button" data-col="'+id+'">'+label+' '+grouped[id].length+'</button>').join("")+'</div><div class="board desktop-only">'+colHtml+'</div><div class="phone-cols">'+grouped[boardCol].map(card).join("")+'</div>';
 }
 function viewCapture(){
   const p=shoe(cap.sku)||PAIRS[14];
@@ -724,7 +1129,7 @@ function viewCapture(){
 function viewClients(){
   const rows=leads();
   const q="";
-  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. Nothing fake on this list.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+nametag(l)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
+  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. People stay on Sable. Lost is a stage, not a delete.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+nametag(l)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
 }
 function viewMeetings(){
   const now=Date.now();
@@ -761,10 +1166,18 @@ function viewPerson(){
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card"><div class="line"><span>'+(t.custom?"Custom pair":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+unitListed(l)+'" aria-label="Pair price" /></span></div>'+(p&&t.custom&&unitListed(l)!==p.price?'<div class="line"><span>Book</span><span>'+zar(p.price)+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
   const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
-  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+"</p>"+
+  const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
+  const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
+    const ip=shoe(it.sku);
+    const bits=[it.size?("UK "+it.size):"Size open",hideName(it.colour),extraLabel(it.extras),it.qty>1?("×"+it.qty):"",zar(it.listed*it.qty+extraSum(it.extras,it.qty))].filter(Boolean);
+    const chips=['<button class="chip '+(!it.size?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(String(it.size)===s?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="'+s+'">'+s+"</button>")).join("");
+    return '<div class="order-line">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div></div>')+'<div><p class="name">'+esc(it.sku)+" · "+esc(it.look)+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p><div class="chips">'+chips+"</div></div></div>";
+  }).join("")+"</div>":"";
+  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="todo">To-do</button><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(t.qty>1?" · "+t.qty+" pairs":"")+(ago?" · last "+ago:"")+"</p>"+
     waRow+
-    (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
-    '<label>UK size</label><div class="chips">'+sizeChips+"</div>"+
+    (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+(t.items.length>1?" · first of "+t.qty:"")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
+    orderLines+
+    sizeBlock+
     '<label>Stage</label><div class="chips">'+stageChips+"</div>"+
     desk+money+
     '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
@@ -773,10 +1186,9 @@ function viewPerson(){
 function Desk(){
   const body=personId?viewPerson():tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
-  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><button class="ghost" type="button" id="out2">Sign out</button></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
+  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }
-
-;
+;\n
 function draw(){
   const root=document.getElementById("root");
   if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
@@ -831,12 +1243,13 @@ function doDone(tid){
   const it=items.find(x=>x.id===tid);
   if(!it||!it.lead) return;
   const l=it.lead;
-  if(it.kind==="whatsapp") patchLead(l.id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
-  else if(it.kind==="close") patchLead(l.id,{status:"closed",paid:true,nextAction:"Closed. Paid."});
+  if(it.kind==="whatsapp") patchLead(l.id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+  else if(it.kind==="size") patchLead(l.id,{nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+  else if(it.kind==="close"){patchLead(l.id,{status:"closed",paid:true,nextAction:"Closed. Paid.",nextActionAt:null});toast="Closed. Next up."}
   else if(it.kind==="follow"&&/lost/i.test(it.step)) patchLead(l.id,{status:"lost",nextAction:"Lost"});
-  else if(it.kind==="referral") patchLead(l.id,{nextAction:"Asked who else wants a pair",nextActionAt:new Date(Date.now()+30*86400000).toISOString()});
-  else if(it.kind==="next") patchLead(l.id,{nextAction:"Offered the next pair",nextActionAt:new Date(Date.now()+60*86400000).toISOString()});
-  else patchLead(l.id,{nextAction:it.kind==="size"?"Follow up on the pair":it.step,nextActionAt:new Date(Date.now()+(it.kind==="pay"?12:24)*3600000).toISOString()});
+  else if(it.kind==="pay") patchLead(l.id,{nextAction:"Invoice sent. Waiting on EFT",nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
+  else if(it.kind==="follow") patchLead(l.id,{nextAction:l.nextAction||"Follow up",nextActionAt:new Date(Date.now()+24*3600000).toISOString()});
+  else patchLead(l.id,{nextAction:it.step,nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
   draw();
 }
 function scoopCap(){
@@ -858,8 +1271,15 @@ function scoopCap(){
 function hookDesk(){
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
+  const copyWant=document.getElementById("copy-want");
+  if(copyWant) copyWant.onclick=function(){
+    const u=clientWebUrl();
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(u).catch(function(){});
+    toast="Client link copied. Send this: "+u;
+    draw();
+  };
   document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});
-  document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");draw()});
+  document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");writeDesk(deskFilter);draw()});
   document.querySelectorAll("[data-col]").forEach(b=>b.onclick=function(){boardCol=b.getAttribute("data-col");draw()});
   document.querySelectorAll("[data-pane]").forEach(b=>b.onclick=function(){pane=b.getAttribute("data-pane");draw()});
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=function(){
@@ -869,6 +1289,10 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
+  document.querySelectorAll("[data-wadone]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-wadone");
+    setTimeout(function(){doDone(id)},500);
+  }));
   document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){scoopCap();cap.size=b.getAttribute("data-size");draw()});
   document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){scoopCap();cap.source=b.getAttribute("data-src");draw()});
   document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){scoopCap();cap.owner=b.getAttribute("data-own");draw()});
@@ -939,7 +1363,8 @@ function hookDesk(){
     patchLead(personId,{
       paid:on,
       status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
-      nextAction:on?"EFT received. Close the card.":(l&&l.nextAction)||"Chase the EFT"
+      nextAction:on?"EFT received. Close the card.":(l&&l.nextAction)||"Chase the EFT",
+      nextActionAt:on?null:l&&l.nextActionAt
     });
     toast=on?"Marked paid.":"Paid undone.";
     draw();
@@ -947,13 +1372,30 @@ function hookDesk(){
   document.querySelectorAll("[data-psize]").forEach(b=>b.onclick=function(){
     if(!personId) return;
     const size=b.getAttribute("data-psize")||"";
-    patchLead(personId,{size,nextAction:size?"Size locked. Confirm the pair.":"Lock the UK size"});
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{size}):it});
+    const ready=items.every(it=>it.size);
+    patchLead(personId,{size:ready?size:"",items,nextAction:ready?"Size locked. Send the invoice.":"Ask for the UK size",nextActionAt:ready?null:l.nextActionAt});
+    toast=size?("UK "+size+" locked."):"Size open.";
+    draw();
+  });
+  document.querySelectorAll("[data-itemsize]").forEach(b=>b.onclick=function(){
+    if(!personId) return;
+    const i=Number(b.getAttribute("data-item")||0);
+    const size=b.getAttribute("data-itemsize")||"";
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,n){return n===i?Object.assign({},it,{size}):it});
+    const ready=items.every(it=>it.size);
+    patchLead(personId,{items,size:ready?(items[0]&&items[0].size)||"":"",nextAction:ready?"Size locked. Send the invoice.":"Ask for the UK size",nextActionAt:ready?null:l.nextActionAt});
     toast=size?("UK "+size+" locked."):"Size open.";
     draw();
   });
   document.querySelectorAll("[data-pqty]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    patchLead(personId,{qty:Number(b.getAttribute("data-pqty")||1)||1});
+    const qty=Number(b.getAttribute("data-pqty")||1)||1;
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{qty}):it});
+    patchLead(personId,{qty,items});
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
@@ -964,7 +1406,10 @@ function hookDesk(){
   });
   document.querySelectorAll("[data-phide]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    patchLead(personId,{colour:b.getAttribute("data-phide")||"book"});
+    const colour=b.getAttribute("data-phide")||"book";
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{colour}):it});
+    patchLead(personId,{colour,items});
     pairView=0;
     draw();
   });
@@ -978,7 +1423,9 @@ function hookDesk(){
   if(psku) psku.onchange=function(){
     if(!personId) return;
     const pair=shoe(psku.value);
-    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null});
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,listed:pair?pair.price:0}):it});
+    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,items});
     pairView=0;
     draw();
   };
@@ -1058,12 +1505,33 @@ function hookDesk(){
     const id=a.getAttribute("data-wa");
     const l=S.leads.find(x=>x.id===id);
     if(l&&(l.status==="new"||l.status==="inbox")){
-      patchLead(id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
+      patchLead(id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
     patchLead(b.getAttribute("data-take"),{owner:mySeller()});
     toast="On Sable.";
+    draw();
+  });
+  document.querySelectorAll("[data-locksize]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-lead");
+    const size=b.getAttribute("data-locksize")||"";
+    if(!id||!size) return;
+    patchLead(id,{size,nextAction:"Size locked. Send the invoice.",nextActionAt:null});
+    toast="UK "+size+" locked.";
+    draw();
+  });
+  document.querySelectorAll("[data-todopaid]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-todopaid");
+    if(!id) return;
+    const l=S.leads.find(x=>x.id===id);
+    patchLead(id,{
+      paid:true,
+      status:l&&l.status==="new"?"contacted":(l&&l.status),
+      nextAction:"EFT received. Close the card.",
+      nextActionAt:null
+    });
+    toast="Marked paid.";
     draw();
   });
   if(tab==="capture"&&toast==="On the board."){
@@ -1099,16 +1567,26 @@ async function ingest(){
     const r=await fetch(API);
     if(!r.ok) return;
     const j=await r.json();
-    const incoming=j.leads||[];
-    let changed=false;
+    const incoming=(j.leads||[]).map(leadFix);
+    const before=S.leads.length;
     for(const row of incoming){
-      if(S.leads.some(l=>l.id===row.id||(norm(l.phone)===norm(row.phone)&&norm(l.name)===norm(row.name)))) continue;
-      S.leads.unshift(leadFix(Object.assign({},row,{status:"new",source:row.source||"website"})));
-      changed=true;
+      const byId=S.leads.find(l=>l.id===row.id);
+      if(byId){
+        const pt=Number(byId.updatedAt||byId.createdAt||0);
+        const nt=Number(row.updatedAt||row.createdAt||0);
+        if(nt>=pt) Object.assign(byId,row,{id:byId.id});
+      }else{
+        S.leads.unshift(row);
+      }
     }
-    if(changed) save();
+    S.leads=keepLeads(S.leads);
+    if(S.leads.length!==before) save();
+    else vaultPush();
   }catch(e){}
 }
 draw();
 ingest();
 setInterval(ingest,20000);
+setInterval(function(){
+  if(S.session&&tab==="todo"&&!personId) draw();
+},30000);

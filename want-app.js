@@ -1,7 +1,9 @@
     const HOUSE_MAIL = "lensleyluan001@gmail.com";
+    const BAG_KEY = "sable-want-bag-v1";
     function zar(n){ if(n==null||n==="") return "POA"; return "R"+Number(n).toLocaleString("en-ZA"); }
     function feeOf(d){ return d==="local"?100:d==="int"?300:0; }
     function digits(p){ return String(p||"").replace(/\D/g,""); }
+    function uidLine(){ return "ln-"+Math.random().toString(36).slice(2,8); }
     const params = new URLSearchParams(location.search);
     let type = params.get("type") || "";
     let sku = params.get("sku") || "";
@@ -19,13 +21,77 @@
     const sizes = document.getElementById("sizes");
     const dels = document.getElementById("dels");
     const msg = document.getElementById("msg");
+    const added = document.getElementById("added");
     const exrow = document.getElementById("exrow");
     const laceCols = document.getElementById("lace-cols");
     const stitchCols = document.getElementById("stitch-cols");
+    const orderEl = document.getElementById("order");
+    const bagEl = document.getElementById("bag");
+    const dock = document.getElementById("dock");
+    const dueEl = document.getElementById("due");
     function selected(){ return shoe(sku); }
     function dueOf(p){
       if(!p) return 0;
-      return p.price + extraSum(extras, 1) + feeOf(delivery);
+      return p.price + extraSum(extras, 1);
+    }
+    function packLine(){
+      const p = selected();
+      if (!p) return null;
+      extras.customNote = String((document.getElementById("custom-note")||{}).value || extras.customNote || "").trim();
+      if (extras.customNote) extras.custom = true;
+      extras.laser = false;
+      extras.laserPhoto = "";
+      return {
+        id: uidLine(),
+        sku: p.sku,
+        look: p.look,
+        size: size || "",
+        colour: hide || "book",
+        extras: extraFix(extras),
+        qty: 1,
+        price: p.price
+      };
+    }
+    function lineKey(it){
+      return [it.sku, it.size||"", it.colour||"book", extraLabel(it.extras)||""].join("|");
+    }
+    function lineDue(it){
+      return Number(it.price||0)*Number(it.qty||1) + extraSum(it.extras, it.qty);
+    }
+    function bagCount(){ return bag.reduce((n,it)=>n+Number(it.qty||1),0); }
+    function bagListed(){ return bag.reduce((n,it)=>n+lineDue(it),0); }
+    function bagDue(){ return bagListed() + feeOf(delivery); }
+    function loadBag(){
+      try{
+        const raw = JSON.parse(localStorage.getItem(BAG_KEY)||"[]");
+        if (!Array.isArray(raw)) return [];
+        return raw.map(function(it){
+          const p = shoe(it.sku);
+          if (!p) return null;
+          return {
+            id: it.id || uidLine(),
+            sku: p.sku,
+            look: p.look,
+            size: String(it.size||""),
+            colour: it.colour || "book",
+            extras: extraFix(it.extras),
+            qty: Math.max(1, Math.min(8, Number(it.qty||1)||1)),
+            price: p.price
+          };
+        }).filter(Boolean);
+      }catch(e){ return []; }
+    }
+    function saveBag(){
+      try{ localStorage.setItem(BAG_KEY, JSON.stringify(bag)); }catch(e){}
+    }
+    let bag = loadBag();
+    let thanks = "";
+    function addLine(it){
+      const key = lineKey(it);
+      const hit = bag.find(x => lineKey(x)===key);
+      if (hit){ hit.qty = Math.min(8, Number(hit.qty||1)+1); }
+      else bag.push(it);
+      saveBag();
     }
     function setQuery(){
       const q = new URLSearchParams();
@@ -66,7 +132,9 @@
         const p = selected();
         if (p) type = p.look;
         viewI = 0;
-        if (p && !lacedLook(p.look)) extras.laces = false;
+        extras = extraFix();
+        const note = document.getElementById("custom-note");
+        if (note) note.value = "";
         draw();
         ask.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -89,8 +157,8 @@
       const extra = extraSum(extras, 1);
       const extraBit = extraLabel(extras);
       hero.innerHTML = turnHtml(p, hide, viewI, extras)+
-        '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+" · "+(delivery==="local"?"Local R100":delivery==="int"?"International R300":"Collect")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
-        '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">Listed'+(feeOf(delivery)?" + send":"")+(extra?" + extras":"")+"</p></div></div>"+
+        '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
+        '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">This pair'+(extra?" + extras":"")+"</p></div></div>"+
         '<label style="margin:10px 14px 0">Hide</label>'+
         '<div class="hides">'+hideChips(hide,"data-whide")+"</div>"+
         '<p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>';
@@ -150,8 +218,69 @@
       ).join("");
       dels.querySelectorAll("[data-del]").forEach(b => b.onclick = function(){
         delivery = b.getAttribute("data-del") || "collect";
-        drawHero(); drawDels();
+        drawBag();
       });
+    }
+    function drawBag(){
+      const n = bagCount();
+      const wantForm = document.getElementById("want");
+      if (thanks && !n){
+        orderEl.hidden = false;
+        document.body.classList.remove("has-bag");
+        dock.hidden = true;
+        if (wantForm) wantForm.hidden = true;
+        const title = document.getElementById("order-title");
+        if (title) title.textContent = "Sent";
+        bagEl.innerHTML = '<p class="ok thanks">'+thanks+"</p>";
+        if (dueEl) dueEl.textContent = "";
+        return;
+      }
+      if (wantForm) wantForm.hidden = false;
+      orderEl.hidden = n===0;
+      document.body.classList.toggle("has-bag", n>0);
+      dock.hidden = n===0;
+      if (n){
+        dock.innerHTML = '<span>Order · '+n+'</span><span>'+zar(bagDue())+"</span>";
+        dock.onclick = function(){ orderEl.scrollIntoView({ behavior:"smooth", block:"start" }); };
+      }
+      const title = document.getElementById("order-title");
+      if (title) title.textContent = n===1 ? "1 pair" : n+" pairs";
+      bagEl.innerHTML = bag.map(function(it){
+        const p = shoe(it.sku);
+        const img = p ? p.img : "";
+        const bits = [it.size?("UK "+it.size):"Size later", hideName(it.colour), extraLabel(it.extras)].filter(Boolean);
+        return '<div class="bag-line">'+
+          (img?'<img src="'+img+'" alt="'+it.sku+'">':'<div></div>')+
+          '<div class="bag-body">'+
+            '<p class="name">'+it.sku+" · "+it.look+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+"</p>"+
+            '<p class="meta">'+bits.join(" · ")+"</p>"+
+            '<p class="price">'+zar(lineDue(it))+"</p>"+
+            '<div class="bag-qty">'+
+              '<button type="button" data-qty="'+it.id+'" data-d="-1" aria-label="Less">−</button>'+
+              '<span>'+it.qty+"</span>"+
+              '<button type="button" data-qty="'+it.id+'" data-d="1" aria-label="More">+</button>'+
+              '<button type="button" class="bag-drop" data-drop="'+it.id+'">Remove</button>'+
+            "</div>"+
+          "</div>"+
+        "</div>";
+      }).join("");
+      bagEl.querySelectorAll("[data-qty]").forEach(b => b.onclick = function(){
+        const id = b.getAttribute("data-qty");
+        const d = Number(b.getAttribute("data-d")||0);
+        const it = bag.find(x => x.id===id);
+        if (!it) return;
+        it.qty = Math.max(0, Math.min(8, Number(it.qty||1)+d));
+        if (it.qty<1) bag = bag.filter(x => x.id!==id);
+        saveBag(); drawBag();
+      });
+      bagEl.querySelectorAll("[data-drop]").forEach(b => b.onclick = function(){
+        bag = bag.filter(x => x.id!==b.getAttribute("data-drop"));
+        saveBag(); drawBag();
+      });
+      if (dueEl){
+        const ship = feeOf(delivery) ? " · send "+zar(feeOf(delivery)) : " · collect";
+        dueEl.textContent = n ? ("Listed "+zar(bagDue())+ship) : "";
+      }
     }
     function draw(){
       drawTypes();
@@ -160,6 +289,7 @@
       drawSizes();
       drawDels();
       drawExtras();
+      drawBag();
       setQuery();
     }
     document.getElementById("custom-note").addEventListener("input", function(){
@@ -167,31 +297,57 @@
       extras.custom = true;
       drawHero();
     });
+    document.getElementById("add").onclick = function(){
+      const it = packLine();
+      if (!it) return;
+      addLine(it);
+      thanks = "";
+      added.hidden = false;
+      added.textContent = bagCount()===1 ? "On the order. Add another pair or send below." : "On the order · "+bagCount()+" pairs.";
+      drawBag();
+      orderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+    document.getElementById("more").onclick = function(){
+      grid.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
     document.getElementById("want").addEventListener("submit", async function(e){
       e.preventDefault();
+      if (!bag.length){
+        const it = packLine();
+        if (it) addLine(it);
+      }
+      if (!bag.length){ msg.className = "err"; msg.textContent = "Add a pair first."; return; }
       const f = Object.fromEntries(new FormData(e.target));
       const name = String(f.name||"").trim();
       const phone = String(f.phone||"").trim();
       if (name.length < 2) { msg.className = "err"; msg.textContent = "Need a name."; return; }
       if (digits(phone).length < 9) { msg.className = "err"; msg.textContent = "WhatsApp number."; return; }
-      extras.customNote = String(document.getElementById("custom-note").value || "").trim();
-      if (extras.customNote) extras.custom = true;
-      extras.laser = false;
-      extras.laserPhoto = "";
-      const p = selected();
-      const packed = extraFix(extras);
       const salesman = String(f.salesman || "").trim();
+      const items = bag.map(function(it){
+        return {
+          sku: it.sku,
+          look: it.look,
+          size: it.size,
+          qty: it.qty,
+          colour: it.colour,
+          extras: extraFix(it.extras),
+          listedPrice: it.price
+        };
+      });
+      const first = items[0];
       const lead = {
-        name, phone, size,
-        sku: p ? p.sku : "",
-        look: p ? p.look : "",
-        price: p ? p.price : 0,
-        qty: 1,
+        name, phone,
+        sku: first.sku,
+        look: first.look,
+        size: items.every(it=>it.size===first.size) ? first.size : "",
+        price: first.listedPrice,
+        qty: bagCount(),
+        items,
         delivery,
         deliveryFee: feeOf(delivery),
-        colour: hide || "book",
-        extras: packed,
-        extrasFee: extraSum(packed, 1),
+        colour: first.colour,
+        extras: extraFix(first.extras),
+        extrasFee: items.reduce((n,it)=>n+extraSum(it.extras, it.qty),0),
         note: String(f.note||"").trim(),
         salesman,
         owner: matchSeller(salesman),
@@ -211,37 +367,36 @@
         ok = r.ok;
       } catch (err) {}
       try {
+        const lines = items.map(it => it.sku+" "+it.look+(it.size?" UK "+it.size:"")+" ×"+it.qty).join(" · ");
         await fetch("https://formsubmit.co/ajax/" + HOUSE_MAIL, {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
-            _subject: "SABLE lead — " + lead.name + (lead.sku ? " · "+lead.sku : ""),
+            _subject: "SABLE lead — " + lead.name + " · " + bagCount() + " pair"+(bagCount()===1?"":"s"),
             name: lead.name,
             phone: lead.phone,
-            sku: lead.sku,
-            look: lead.look,
-            size: lead.size,
-            hide: hideName(lead.colour),
-            extras: extraLabel(packed) || "None",
-            extrasFee: extraSum(packed, 1) ? zar(extraSum(packed, 1)) : "",
-            custom: packed.customNote || "",
+            pairs: lines,
+            sku: items.map(it=>it.sku).join(", "),
+            hide: items.map(it=>hideName(it.colour)).join(", "),
+            extras: items.map(it=>extraLabel(it.extras)||"None").join(" · "),
             salesman: salesman || "",
             delivery: lead.delivery,
-            listed: p ? zar(p.price) : "",
+            listed: zar(bagDue()),
             note: lead.note,
             source: "web /want"
           })
         });
       } catch (err) {}
-      msg.className = "ok";
-      msg.textContent = ok
-        ? "With Sable. We will WhatsApp you."
+      thanks = ok
+        ? ("With Sable. We will WhatsApp you about "+(bagCount()===1?"the pair":(bagCount()+" pairs"))+".")
         : "Sent. If we do not reply today, WhatsApp the house.";
+      bag = [];
+      saveBag();
       e.target.reset();
       extras = extraFix();
       document.getElementById("custom-note").value = "";
-      drawExtras();
-      drawHero();
+      added.hidden = true;
+      draw();
     });
     if (sku && !shoe(sku)) sku = "";
     if (sku) {

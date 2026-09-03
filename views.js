@@ -1,19 +1,111 @@
 function viewTodo(){
   const items=buildTodos();
-  const live=items.filter(i=>i.lane==="live");
-  const second=items.filter(i=>i.lane==="second");
-  function stack(list,lane){
-    if(!houseView()||deskFilter!=="all") return list.map(todoRow).join("")||'<p class="empty">Nothing here.</p>';
-    let html="";
-    const loose=list.filter(i=>(i.lead?i.lead.owner:i.owner)==null);
-    if(loose.length) html+='<div class="desk-block"><h4>Unassigned</h4>'+loose.map(todoRow).join("")+"</div>";
-    for(const s of SELLERS){
-      const rows=list.filter(i=>(i.lead?i.lead.owner:i.owner)===s);
-      html+='<div class="desk-block"><div class="spread"><h4>'+SL[s]+'</h4><p class="meta">'+rows.length+'</p></div>'+(rows.length?rows.map(todoRow).join(""):'<p class="empty">Clear.</p>')+"</div>";
-    }
-    return html;
+  const now=items.filter(it=>it.lane==="now");
+  const wait=items.filter(it=>it.lane==="wait");
+  const houseAll=houseView()&&deskFilter==="all";
+  const who=houseAll?"Floor":(SL[deskFilter]||SL[mySeller()]||"Your");
+  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" waiting":"");
+  const sub=houseAll
+    ?"Unassigned only. Open a name to work that book."
+    :who+"'s book. Only "+who+"'s people.";
+  const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo");
+  if(!now.length&&!wait.length){
+    return '<div class="todo-wrap">'+head+'<div class="todo-clear"><p class="todo-verb">Book is clear</p><p class="meta">Capture if the floor is quiet.</p><button class="solid tight" type="button" data-tab="capture">Capture</button></div></div>';
   }
-  return '<p class="kicker">CRM</p><h1>To-do</h1><p class="sub">'+(houseView()?"Live is the pair in hand. Second is how the house grows. Everyone under Wian, Luan, Dylan.":"Live is your open people. Second is how you fill tomorrow — capture, ask, book a fit.")+"</p>"+deskChips()+'<details class="card"><summary>Live · capture to paid</summary><ol><li><span>1</span><div><p>Capture</p><p class="meta">Name, WhatsApp, the 45xxx. On the board the same minute.</p></div></li><li><span>2</span><div><p>First message</p><p class="meta">Stock, type, listed. Ask UK size. Do not discount.</p></div></li><li><span>3</span><div><p>Lock the pair</p><p class="meta">Size, hide, collect or send.</p></div></li><li><span>4</span><div><p>Invoice</p><p class="meta">EFT before the pair is confirmed.</p></div></li><li><span>5</span><div><p>Follow up</p><p class="meta">One chase if they ghost after price. Then lost.</p></div></li></ol></details><div class="lane"><p class="kicker">Live</p><h3>On the pair now</h3><p class="meta">WhatsApp, size, EFT, close.</p>'+(live.length?stack(live,"live"):'<p class="empty">Nothing here.</p>')+'</div><div class="lane"><p class="kicker">Second</p><h3>Fill the book</h3><p class="meta">Capture, ask, book a fit. Tomorrow\'s money.</p>'+stack(second,"second")+"</div>";
+  const hero=now[0]?todoHero(now[0],now.length):(wait.length?'<div class="todo-clear"><p class="todo-verb">Waiting on them</p><p class="meta">'+wait.length+" parked. They have not replied yet.</p></div>":"");
+  const rest=now.slice(1);
+  const up=(!houseAll&&rest.length)?'<p class="kicker todo-then">Up next</p>'+todoQueue(rest,2):"";
+  const waiting=wait.length
+    ?'<details class="todo-park"'+(now.length?"":" open")+"><summary>Waiting on them · "+wait.length+"</summary>"+todoQueue(wait)+"</details>"
+    :"";
+  const floor=houseAll?todoBooks():"";
+  return '<div class="todo-wrap">'+head+hero+up+waiting+floor+"</div>";
+}
+function mBlock(kicker,num,meta,cls){
+  return '<div class="m-block'+(cls?" "+cls:"")+'"><p class="kicker">'+kicker+'</p><p class="m-num">'+num+"</p>"+(meta?'<p class="meta">'+meta+"</p>":"")+"</div>";
+}
+function moneyChart(months,thisKey){
+  const w=720,h=220,padL=4,padR=4,padT=18,padB=36;
+  const max=Math.max.apply(null,months.map(function(m){return m.paid}).concat([1]));
+  const inner=w-padL-padR;
+  const gap=7;
+  const bw=(inner-(months.length-1)*gap)/months.length;
+  const bars=months.map(function(m,i){
+    const x=padL+i*(bw+gap);
+    const bh=Math.max(m.paid?6:2,(m.paid/max)*(h-padT-padB));
+    const y=h-padB-bh;
+    const now=m.key===thisKey?" now":"";
+    const op=m.paid?"":" faint";
+    return '<g class="m-col'+now+op+'"><rect class="bar" x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="5"><title>'+esc(m.label)+" · "+zar(m.paid)+" · "+m.pairs+" pairs</title></rect><text x='"+(x+bw/2)+"' y='"+(h-12)+"' text-anchor='middle'>"+esc(m.label)+"</text></g>";
+  }).join("");
+  return '<div class="m-chart card span2"><div class="spread"><p class="kicker">Sales each month</p><p class="meta">Paid rand · last 12 months · peak '+zar(max)+"</p></div><svg class='m-svg' viewBox='0 0 "+w+" "+h+"' role='img' aria-label='Paid sales by month'>"+bars+"</svg></div>";
+}
+function moneyRatio(m){
+  const a=Math.max(0,Math.min(100,m.mixApps));
+  const p=Math.max(0,Math.min(100,m.mixPaid));
+  return '<div class="m-block span2 m-ratio">'+
+    '<p class="kicker">Apps in · shoes paid out</p>'+
+    '<div class="m-ratio-row">'+
+      '<div><p class="m-num">'+m.apps+'</p><p class="meta">Apps in</p></div>'+
+      '<div class="m-ratio-mid"><p class="m-num">'+pct(m.conv)+'</p><p class="meta">of apps paid</p></div>'+
+      '<div class="m-ratio-end"><p class="m-num">'+m.paidPairs+'</p><p class="meta">Pairs paid</p></div>'+
+    "</div>"+
+    '<div class="m-bar" aria-hidden="true"><i style="width:'+a+'%"></i><i class="gold" style="width:'+p+'%"></i></div>'+
+    '<p class="meta">'+pct(a)+" of this mix is website apps · "+pct(p)+" is pairs paid. "+m.appsPaid+" of "+m.apps+" lookbook apps have paid"+(m.appsPaidPairs?" · "+m.appsPaidPairs+" pairs":"")+".</p>"+
+  "</div>";
+}
+function moneyMix(label,parts){
+  const total=parts.reduce(function(n,p){return n+p.n},0)||1;
+  const rows=parts.map(function(p){
+    const w=Math.round((p.n/total)*100);
+    return '<div class="m-mix-row"><span>'+esc(p.label)+'</span><b>'+p.n+'</b><span class="m-mini"><i style="width:'+w+'%"></i></span><span>'+w+"%</span></div>";
+  }).join("");
+  return '<div class="m-block"><p class="kicker">'+esc(label)+"</p>"+rows+"</div>";
+}
+function viewMoney(rows){
+  const m=tallyMoney(rows);
+  const who=deskFilter==="all"?"House":((SL[deskFilter]||"This")+"'s book");
+  const mom=m.mom>0?("+"+Math.round(m.mom)+"% vs last"):(m.mom<0?(Math.round(m.mom)+"% vs last"):"Flat vs last");
+  const head='<p class="kicker">CRM · Money</p><div class="spread"><h1>Board</h1><div class="row"><button class="chip" type="button" data-pane="work">Work</button><button class="chip on" type="button" data-pane="money">Money</button><button class="chip" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+
+    '<p class="sub">'+esc(who)+". Numbers in blocks. Website apps against pairs that paid. Graph is cash in the door, by month.</p>";
+  const top='<div class="money-grid">'+
+    mBlock("Cash in",zar(m.paidRand),m.paidTickets+" paid · "+m.paidPairs+" pairs")+
+    mBlock("This month",zar(m.thisPaid),mom+" · "+m.thisPairs+" pairs")+
+    mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" invoice"+(m.invOpen===1?"":"s")+" out"):"None waiting",m.eftDue?" warn":"")+
+    mBlock("Pair profit",zar(m.paidProfit),"On paid · margin "+pct(m.margin))+
+    "</div>";
+  const mid='<div class="money-grid">'+
+    moneyRatio(m)+
+    mBlock("Apps in",String(m.apps),m.thisApps+" this month · lookbook")+
+    mBlock("Shoes paid",String(m.paidPairs),m.appsPaidPairs+" of them from the site")+
+    mBlock("Average ticket",zar(Math.round(m.avg)),m.paidTickets+" closed tickets")+
+    mBlock("Close rate",pct(m.closeRate),m.paidTickets+" paid of "+m.live+" live")+
+    "</div>";
+  const cuts='<p class="kicker money-h">Cuts on paid</p><div class="money-grid">'+
+    mBlock("Wian",zar(m.cuts.wian),"Share of pair profit")+
+    mBlock("Luan",zar(m.cuts.luan),"Share of pair profit")+
+    mBlock("Dylan",zar(m.cuts.dylan),"Share of pair profit")+
+    mBlock("House",zar(m.cuts.house),"Share of pair profit")+
+    "</div>";
+  const bookKeys=[["luan","Luan"],["dylan","Dylan"],["wian","Wian"],["floor","Floor"]];
+  const bookBlocks=bookKeys.map(function(pair){
+    const b=m.books[pair[0]]||{paid:0,pairs:0,profit:0,apps:0};
+    return mBlock(pair[1],zar(b.paid),b.pairs+" pairs · profit "+zar(b.profit)+(b.apps?" · "+b.apps+" apps":""));
+  }).join("");
+  const books='<p class="kicker money-h">By book</p><div class="money-grid">'+bookBlocks+"</div>";
+  const mix='<p class="kicker money-h">Mix</p><div class="money-grid">'+
+    moneyMix("Source",[{label:"Website",n:m.src.website},{label:"WhatsApp",n:m.src.whatsapp},{label:"Other",n:m.src.other}])+
+    moneyMix("How they take it",[{label:"Collect",n:m.collectN},{label:"Delivery",n:m.deliverN}])+
+    moneyMix("Pair",[{label:"Book",n:m.bookN},{label:"Custom",n:m.customN}])+
+    mBlock("Still open",zar(m.openDue),"Listed on the floor · lost "+zar(m.lostRand))+
+    "</div>";
+  const wait=m.outstanding.length
+    ? m.outstanding.slice(0,8).map(function(o){
+        return '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>";
+      }).join("")
+    : '<p class="meta">None waiting.</p>';
+  const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
+  return head+'<div class="money-dash">'+top+mid+moneyChart(m.months,m.thisKey)+cuts+books+mix+out+"</div>";
 }
 function viewBoard(){
   const rows=leads();
@@ -29,24 +121,11 @@ function viewBoard(){
     const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
+    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([t.qty>1?(t.qty+" pairs"):"",l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
   }
-  if(pane==="money"&&seeCost()){
-    let listed=0,profit=0,cuts={wian:0,luan:0,dylan:0,house:0};
-    const lines=rows.filter(l=>l.status!=="lost").map(l=>{
-      const p=shoe(l.sku)||{price:0,cost:0};
-      const t=ticket(l);
-      const q=t.qty;
-      const L=t.listed,C=(p.cost||0)*q,pr=Math.max(0,L-C);
-      listed+=L;profit+=pr;
-      const sp=splitOf(l.owner);
-      cuts.wian+=Math.round(pr*sp.wian);cuts.luan+=Math.round(pr*sp.luan);cuts.dylan+=Math.round(pr*sp.dylan);cuts.house+=Math.round(pr*sp.house);
-      return '<div class="line"><span>'+esc(l.name)+' · '+esc(l.sku)+'</span><span>'+zar(L)+(seeCost()?" · "+zar(pr):"")+'</span></div>';
-    }).join("");
-    return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row"><button class="chip" type="button" data-pane="work">Work</button><button class="chip on" type="button" data-pane="money">Money</button><button class="chip on" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+'<div class="money card"><div class="line"><span>Listed</span><span>'+zar(listed)+'</span></div><div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div><div class="line"><span>Wian</span><span>'+zar(cuts.wian)+'</span></div><div class="line"><span>Luan</span><span>'+zar(cuts.luan)+'</span></div><div class="line"><span>Dylan</span><span>'+zar(cuts.dylan)+'</span></div><div class="line"><span>House</span><span>'+zar(cuts.house)+'</span></div></div><div class="money" style="margin-top:18px">'+lines+'</div>';
-  }
+  if(pane==="money"&&seeCost()) return viewMoney(rows);
   const colHtml=cols.map(([id,label])=>'<section><p class="kicker">'+label+' · '+grouped[id].length+'</p>'+(grouped[id].map(card).join("")||'<p class="empty">Clear.</p>')+"</section>").join("");
-  return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row">'+(seeCost()?'<button class="chip on" type="button" data-pane="work">Work</button><button class="chip" type="button" data-pane="money">Money</button>':"")+'<button class="chip on" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+metrics+'<div class="chips" style="margin:0 0 12px">'+cols.map(([id,label])=>'<button class="chip '+(boardCol===id?"on":"")+'" type="button" data-col="'+id+'">'+label+' '+grouped[id].length+'</button>').join("")+'</div><div class="board desktop-only">'+colHtml+'</div><div class="phone-cols">'+grouped[boardCol].map(card).join("")+'</div>';
+  return '<p class="kicker">CRM</p><div class="spread"><h1>Board</h1><div class="row">'+(seeCost()?'<button class="chip on" type="button" data-pane="work">Work</button><button class="chip" type="button" data-pane="money">Money</button>':"")+'<button class="chip" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+metrics+'<div class="chips" style="margin:0 0 12px">'+cols.map(([id,label])=>'<button class="chip '+(boardCol===id?"on":"")+'" type="button" data-col="'+id+'">'+label+' '+grouped[id].length+'</button>').join("")+'</div><div class="board desktop-only">'+colHtml+'</div><div class="phone-cols">'+grouped[boardCol].map(card).join("")+'</div>';
 }
 function viewCapture(){
   const p=shoe(cap.sku)||PAIRS[14];
@@ -84,7 +163,7 @@ function viewCapture(){
 function viewClients(){
   const rows=leads();
   const q="";
-  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. Nothing fake on this list.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+nametag(l)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
+  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. People stay on Sable. Lost is a stage, not a delete.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+nametag(l)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
 }
 function viewMeetings(){
   const now=Date.now();
@@ -121,10 +200,18 @@ function viewPerson(){
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card"><div class="line"><span>'+(t.custom?"Custom pair":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+unitListed(l)+'" aria-label="Pair price" /></span></div>'+(p&&t.custom&&unitListed(l)!==p.price?'<div class="line"><span>Book</span><span>'+zar(p.price)+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
   const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip on" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
-  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(ago?" · last "+ago:"")+"</p>"+
+  const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
+  const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
+    const ip=shoe(it.sku);
+    const bits=[it.size?("UK "+it.size):"Size open",hideName(it.colour),extraLabel(it.extras),it.qty>1?("×"+it.qty):"",zar(it.listed*it.qty+extraSum(it.extras,it.qty))].filter(Boolean);
+    const chips=['<button class="chip '+(!it.size?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(String(it.size)===s?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="'+s+'">'+s+"</button>")).join("");
+    return '<div class="order-line">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div></div>')+'<div><p class="name">'+esc(it.sku)+" · "+esc(it.look)+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p><div class="chips">'+chips+"</div></div></div>";
+  }).join("")+"</div>":"";
+  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="todo">To-do</button><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(t.qty>1?" · "+t.qty+" pairs":"")+(ago?" · last "+ago:"")+"</p>"+
     waRow+
-    (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
-    '<label>UK size</label><div class="chips">'+sizeChips+"</div>"+
+    (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+(t.items.length>1?" · first of "+t.qty:"")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
+    orderLines+
+    sizeBlock+
     '<label>Stage</label><div class="chips">'+stageChips+"</div>"+
     desk+money+
     '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
@@ -133,5 +220,5 @@ function viewPerson(){
 function Desk(){
   const body=personId?viewPerson():tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():viewTodo();
   const flash=toast?( /need|wrong|type |eight|whatsapp number/i.test(toast) ? '<p class="err">'+esc(toast)+"</p>" : '<p class="ok">'+esc(toast)+"</p>" ) : "";
-  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><button class="ghost" type="button" id="out2">Sign out</button></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
+  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["board","Board"],["todo","To-do"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
 }

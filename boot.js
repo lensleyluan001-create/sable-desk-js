@@ -52,12 +52,13 @@ function doDone(tid){
   const it=items.find(x=>x.id===tid);
   if(!it||!it.lead) return;
   const l=it.lead;
-  if(it.kind==="whatsapp") patchLead(l.id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
-  else if(it.kind==="close") patchLead(l.id,{status:"closed",paid:true,nextAction:"Closed. Paid."});
+  if(it.kind==="whatsapp") patchLead(l.id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+  else if(it.kind==="size") patchLead(l.id,{nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+  else if(it.kind==="close"){patchLead(l.id,{status:"closed",paid:true,nextAction:"Closed. Paid.",nextActionAt:null});toast="Closed. Next up."}
   else if(it.kind==="follow"&&/lost/i.test(it.step)) patchLead(l.id,{status:"lost",nextAction:"Lost"});
-  else if(it.kind==="referral") patchLead(l.id,{nextAction:"Asked who else wants a pair",nextActionAt:new Date(Date.now()+30*86400000).toISOString()});
-  else if(it.kind==="next") patchLead(l.id,{nextAction:"Offered the next pair",nextActionAt:new Date(Date.now()+60*86400000).toISOString()});
-  else patchLead(l.id,{nextAction:it.kind==="size"?"Follow up on the pair":it.step,nextActionAt:new Date(Date.now()+(it.kind==="pay"?12:24)*3600000).toISOString()});
+  else if(it.kind==="pay") patchLead(l.id,{nextAction:"Invoice sent. Waiting on EFT",nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
+  else if(it.kind==="follow") patchLead(l.id,{nextAction:l.nextAction||"Follow up",nextActionAt:new Date(Date.now()+24*3600000).toISOString()});
+  else patchLead(l.id,{nextAction:it.step,nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
   draw();
 }
 function scoopCap(){
@@ -79,8 +80,15 @@ function scoopCap(){
 function hookDesk(){
   const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
   const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
+  const copyWant=document.getElementById("copy-want");
+  if(copyWant) copyWant.onclick=function(){
+    const u=clientWebUrl();
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(u).catch(function(){});
+    toast="Client link copied. Send this: "+u;
+    draw();
+  };
   document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=function(){tab=b.getAttribute("data-tab");personId=null;draw()});
-  document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");draw()});
+  document.querySelectorAll("[data-desk]").forEach(b=>b.onclick=function(){deskFilter=b.getAttribute("data-desk");writeDesk(deskFilter);draw()});
   document.querySelectorAll("[data-col]").forEach(b=>b.onclick=function(){boardCol=b.getAttribute("data-col");draw()});
   document.querySelectorAll("[data-pane]").forEach(b=>b.onclick=function(){pane=b.getAttribute("data-pane");draw()});
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=function(){
@@ -90,6 +98,10 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-done]").forEach(b=>b.onclick=function(){doDone(b.getAttribute("data-done"))});
+  document.querySelectorAll("[data-wadone]").forEach(a=>a.addEventListener("click",function(){
+    const id=a.getAttribute("data-wadone");
+    setTimeout(function(){doDone(id)},500);
+  }));
   document.querySelectorAll("[data-size]").forEach(b=>b.onclick=function(){scoopCap();cap.size=b.getAttribute("data-size");draw()});
   document.querySelectorAll("[data-src]").forEach(b=>b.onclick=function(){scoopCap();cap.source=b.getAttribute("data-src");draw()});
   document.querySelectorAll("[data-own]").forEach(b=>b.onclick=function(){scoopCap();cap.owner=b.getAttribute("data-own");draw()});
@@ -160,7 +172,8 @@ function hookDesk(){
     patchLead(personId,{
       paid:on,
       status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
-      nextAction:on?"EFT received. Close the card.":(l&&l.nextAction)||"Chase the EFT"
+      nextAction:on?"EFT received. Close the card.":(l&&l.nextAction)||"Chase the EFT",
+      nextActionAt:on?null:l&&l.nextActionAt
     });
     toast=on?"Marked paid.":"Paid undone.";
     draw();
@@ -168,13 +181,30 @@ function hookDesk(){
   document.querySelectorAll("[data-psize]").forEach(b=>b.onclick=function(){
     if(!personId) return;
     const size=b.getAttribute("data-psize")||"";
-    patchLead(personId,{size,nextAction:size?"Size locked. Confirm the pair.":"Lock the UK size"});
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{size}):it});
+    const ready=items.every(it=>it.size);
+    patchLead(personId,{size:ready?size:"",items,nextAction:ready?"Size locked. Send the invoice.":"Ask for the UK size",nextActionAt:ready?null:l.nextActionAt});
+    toast=size?("UK "+size+" locked."):"Size open.";
+    draw();
+  });
+  document.querySelectorAll("[data-itemsize]").forEach(b=>b.onclick=function(){
+    if(!personId) return;
+    const i=Number(b.getAttribute("data-item")||0);
+    const size=b.getAttribute("data-itemsize")||"";
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,n){return n===i?Object.assign({},it,{size}):it});
+    const ready=items.every(it=>it.size);
+    patchLead(personId,{items,size:ready?(items[0]&&items[0].size)||"":"",nextAction:ready?"Size locked. Send the invoice.":"Ask for the UK size",nextActionAt:ready?null:l.nextActionAt});
     toast=size?("UK "+size+" locked."):"Size open.";
     draw();
   });
   document.querySelectorAll("[data-pqty]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    patchLead(personId,{qty:Number(b.getAttribute("data-pqty")||1)||1});
+    const qty=Number(b.getAttribute("data-pqty")||1)||1;
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{qty}):it});
+    patchLead(personId,{qty,items});
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
@@ -185,7 +215,10 @@ function hookDesk(){
   });
   document.querySelectorAll("[data-phide]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    patchLead(personId,{colour:b.getAttribute("data-phide")||"book"});
+    const colour=b.getAttribute("data-phide")||"book";
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{colour}):it});
+    patchLead(personId,{colour,items});
     pairView=0;
     draw();
   });
@@ -199,7 +232,9 @@ function hookDesk(){
   if(psku) psku.onchange=function(){
     if(!personId) return;
     const pair=shoe(psku.value);
-    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null});
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,listed:pair?pair.price:0}):it});
+    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,items});
     pairView=0;
     draw();
   };
@@ -279,12 +314,33 @@ function hookDesk(){
     const id=a.getAttribute("data-wa");
     const l=S.leads.find(x=>x.id===id);
     if(l&&(l.status==="new"||l.status==="inbox")){
-      patchLead(id,{status:"contacted",nextAction:"One follow-up if they ghost",nextActionAt:new Date(Date.now()+86400000).toISOString()});
+      patchLead(id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
     patchLead(b.getAttribute("data-take"),{owner:mySeller()});
     toast="On Sable.";
+    draw();
+  });
+  document.querySelectorAll("[data-locksize]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-lead");
+    const size=b.getAttribute("data-locksize")||"";
+    if(!id||!size) return;
+    patchLead(id,{size,nextAction:"Size locked. Send the invoice.",nextActionAt:null});
+    toast="UK "+size+" locked.";
+    draw();
+  });
+  document.querySelectorAll("[data-todopaid]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-todopaid");
+    if(!id) return;
+    const l=S.leads.find(x=>x.id===id);
+    patchLead(id,{
+      paid:true,
+      status:l&&l.status==="new"?"contacted":(l&&l.status),
+      nextAction:"EFT received. Close the card.",
+      nextActionAt:null
+    });
+    toast="Marked paid.";
     draw();
   });
   if(tab==="capture"&&toast==="On the board."){
@@ -320,16 +376,26 @@ async function ingest(){
     const r=await fetch(API);
     if(!r.ok) return;
     const j=await r.json();
-    const incoming=j.leads||[];
-    let changed=false;
+    const incoming=(j.leads||[]).map(leadFix);
+    const before=S.leads.length;
     for(const row of incoming){
-      if(S.leads.some(l=>l.id===row.id||(norm(l.phone)===norm(row.phone)&&norm(l.name)===norm(row.name)))) continue;
-      S.leads.unshift(leadFix(Object.assign({},row,{status:"new",source:row.source||"website"})));
-      changed=true;
+      const byId=S.leads.find(l=>l.id===row.id);
+      if(byId){
+        const pt=Number(byId.updatedAt||byId.createdAt||0);
+        const nt=Number(row.updatedAt||row.createdAt||0);
+        if(nt>=pt) Object.assign(byId,row,{id:byId.id});
+      }else{
+        S.leads.unshift(row);
+      }
     }
-    if(changed) save();
+    S.leads=keepLeads(S.leads);
+    if(S.leads.length!==before) save();
+    else vaultPush();
   }catch(e){}
 }
 draw();
 ingest();
 setInterval(ingest,20000);
+setInterval(function(){
+  if(S.session&&tab==="todo"&&!personId) draw();
+},30000);

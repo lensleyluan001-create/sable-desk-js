@@ -600,6 +600,13 @@
     .person-ticket-hero { font-size: 12px; letter-spacing: .12em; }
     .desktop-only { display: none; }
     .money-dash { display: grid; gap: 16px; margin-top: 4px; }
+    .money-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.9fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+    .money-side { align-content: start; grid-template-columns: repeat(2, minmax(0,1fr)); }
     .money-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
     .m-block {
       background: var(--card);
@@ -618,7 +625,7 @@
       font-variant-numeric: tabular-nums;
     }
     .m-block .meta { margin: 8px 0 0; }
-    .m-block.span2, .m-chart.span2 { grid-column: 1 / -1; }
+    .m-block.span2 { grid-column: 1 / -1; }
     .m-block.warn .m-num { color: var(--hot); }
     .money-h { margin: 18px 0 0; }
     .m-ratio-row {
@@ -639,16 +646,33 @@
     }
     .m-bar i { display: block; height: 100%; background: var(--ink); }
     .m-bar i.gold { background: var(--gold); }
-    .m-chart { padding: 16px 16px 10px; }
+    .m-chart {
+      padding: 16px 12px 10px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
     .m-svg { width: 100%; height: auto; display: block; color: var(--muted); }
     .m-svg .bar { fill: var(--gold); }
     .m-svg .now .bar { fill: var(--ink); }
     .m-svg .faint .bar { fill: var(--line-strong); }
+    .m-svg .m-grid {
+      stroke: color-mix(in srgb, #1c1814 16%, transparent);
+      stroke-width: 1;
+    }
+    .m-svg .m-grid-5 {
+      stroke: color-mix(in srgb, #1c1814 7%, transparent);
+      stroke-width: 1;
+    }
     .m-svg text {
       font-family: var(--font-body);
-      font-size: 11px;
       fill: var(--muted);
     }
+    .m-svg .m-y { font-size: 9px; font-variant-numeric: tabular-nums; }
+    .m-svg .m-y.major { font-size: 10px; fill: var(--ink); font-weight: 600; }
+    .m-svg .m-x { font-size: 10px; }
+    .m-svg .m-n { font-size: 10px; font-weight: 600; fill: var(--ink); font-variant-numeric: tabular-nums; }
     .m-mix-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -681,6 +705,9 @@
       font-size: 14px;
     }
     .m-wait span:last-child { color: var(--muted); white-space: nowrap; }
+    @media (max-width: 879px) {
+      .money-split { grid-template-columns: 1fr; }
+    }
     @media (max-width: 640px) {
       .todo-line { padding: 12px 14px; }
       .pair.cap-pair .cap-shot { grid-template-columns: 1fr; }

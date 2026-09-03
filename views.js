@@ -26,20 +26,36 @@ function mBlock(kicker,num,meta,cls){
   return '<div class="m-block'+(cls?" "+cls:"")+'"><p class="kicker">'+kicker+'</p><p class="m-num">'+num+"</p>"+(meta?'<p class="meta">'+meta+"</p>":"")+"</div>";
 }
 function moneyChart(months,thisKey){
-  const w=720,h=220,padL=4,padR=4,padT=18,padB=36;
-  const max=Math.max.apply(null,months.map(function(m){return m.paid}).concat([1]));
-  const inner=w-padL-padR;
-  const gap=7;
-  const bw=(inner-(months.length-1)*gap)/months.length;
-  const bars=months.map(function(m,i){
-    const x=padL+i*(bw+gap);
-    const bh=Math.max(m.paid?6:2,(m.paid/max)*(h-padT-padB));
-    const y=h-padB-bh;
-    const now=m.key===thisKey?" now":"";
-    const op=m.paid?"":" faint";
-    return '<g class="m-col'+now+op+'"><rect class="bar" x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="5"><title>'+esc(m.label)+" · "+zar(m.paid)+" · "+m.pairs+" pairs</title></rect><text x='"+(x+bw/2)+"' y='"+(h-12)+"' text-anchor='middle'>"+esc(m.label)+"</text></g>";
+  const w=560,h=420,padL=36,padR=8,padT=10,padB=28;
+  const plotW=w-padL-padR, plotH=h-padT-padB;
+  const max=100;
+  const step=5;
+  const ticks=[];
+  for(let n=0;n<=max;n+=step) ticks.push(n);
+  const grid=ticks.map(function(n){
+    const y=padT+((max-n)/max)*plotH;
+    const major=n%10===0;
+    return '<line class="'+(major?"m-grid":"m-grid-5")+'" x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" />'+
+      '<text class="m-y'+(major?" major":"")+'" x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end">'+n+"</text>";
   }).join("");
-  return '<div class="m-chart card span2"><div class="spread"><p class="kicker">Sales each month</p><p class="meta">Paid rand · last 12 months · peak '+zar(max)+"</p></div><svg class='m-svg' viewBox='0 0 "+w+" "+h+"' role='img' aria-label='Paid sales by month'>"+bars+"</svg></div>";
+  const gap=6;
+  const bw=(plotW-(months.length-1)*gap)/months.length;
+  const bars=months.map(function(m,i){
+    const pairs=Number(m.pairs)||0;
+    const shown=Math.min(max,pairs);
+    const x=padL+i*(bw+gap);
+    const bh=shown?(shown/max)*plotH:2;
+    const y=padT+plotH-bh;
+    const now=m.key===thisKey?" now":"";
+    const op=pairs?"":" faint";
+    const label=pairs?('<text class="m-n" x="'+(x+bw/2)+'" y="'+(y-4)+'" text-anchor="middle">'+pairs+"</text>"):"";
+    return '<g class="m-col'+now+op+'"><rect class="bar" x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="4"><title>'+esc(m.label)+" · "+pairs+(pairs===1?" pair":" pairs")+"</title></rect>"+label+'<text class="m-x" x="'+(x+bw/2)+'" y="'+(h-8)+'" text-anchor="middle">'+esc(m.label)+"</text></g>";
+  }).join("");
+  const total=months.reduce(function(n,m){return n+(Number(m.pairs)||0)},0);
+  return '<div class="m-chart">'+
+    '<div class="spread"><p class="kicker">Pairs sold</p><p class="meta">0–100 in 5s · '+total+" this year</p></div>"+
+    '<svg class="m-svg" viewBox="0 0 '+w+" "+h+'" role="img" aria-label="Pairs sold each month, scale 0 to 100 in fives">'+grid+bars+"</svg>"+
+  "</div>";
 }
 function moneyRatio(m){
   const a=Math.max(0,Math.min(100,m.mixApps));
@@ -68,18 +84,22 @@ function viewMoney(rows){
   const who=deskFilter==="all"?"House":((SL[deskFilter]||"This")+"'s book");
   const mom=m.mom>0?("+"+Math.round(m.mom)+"% vs last"):(m.mom<0?(Math.round(m.mom)+"% vs last"):"Flat vs last");
   const head='<p class="kicker">CRM · Money</p><div class="spread"><h1>Board</h1><div class="row"><button class="chip" type="button" data-pane="work">Work</button><button class="chip on" type="button" data-pane="money">Money</button><button class="chip" type="button" data-tab="capture">Capture</button></div></div>'+deskChips()+
-    '<p class="sub">'+esc(who)+". Numbers in blocks. Website apps against pairs that paid. Graph is cash in the door, by month.</p>";
-  const top='<div class="money-grid">'+
-    mBlock("Cash in",zar(m.paidRand),m.paidTickets+" paid · "+m.paidPairs+" pairs")+
-    mBlock("This month",zar(m.thisPaid),mom+" · "+m.thisPairs+" pairs")+
-    mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" invoice"+(m.invOpen===1?"":"s")+" out"):"None waiting",m.eftDue?" warn":"")+
-    mBlock("Pair profit",zar(m.paidProfit),"On paid · margin "+pct(m.margin))+
-    "</div>";
+    '<p class="sub">'+esc(who)+". Graph on the left is pairs sold, 0 to 100 in fives.</p>";
+  const split='<div class="money-split">'+
+    moneyChart(m.months,m.thisKey)+
+    '<div class="money-side money-grid">'+
+      mBlock("Pairs sold",String(m.paidPairs),"Paid on this book")+
+      mBlock("This month",String(m.thisPairs),zar(m.thisPaid)+" in · "+mom)+
+      mBlock("Cash in",zar(m.paidRand),m.paidTickets+" paid")+
+      mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" invoice"+(m.invOpen===1?"":"s")+" out"):"None waiting",m.eftDue?" warn":"")+
+      mBlock("Pair profit",zar(m.paidProfit),"On paid · margin "+pct(m.margin))+
+      mBlock("Average ticket",zar(Math.round(m.avg)),m.paidTickets+" closed tickets")+
+    "</div>"+
+  "</div>";
   const mid='<div class="money-grid">'+
     moneyRatio(m)+
     mBlock("Apps in",String(m.apps),m.thisApps+" this month · lookbook")+
     mBlock("Shoes paid",String(m.paidPairs),m.appsPaidPairs+" of them from the site")+
-    mBlock("Average ticket",zar(Math.round(m.avg)),m.paidTickets+" closed tickets")+
     mBlock("Close rate",pct(m.closeRate),m.paidTickets+" paid of "+m.live+" live")+
     "</div>";
   const cuts='<p class="kicker money-h">Cuts on paid</p><div class="money-grid">'+
@@ -106,7 +126,7 @@ function viewMoney(rows){
       }).join("")
     : '<p class="meta">None waiting.</p>';
   const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
-  return head+'<div class="money-dash">'+top+mid+moneyChart(m.months,m.thisKey)+cuts+books+mix+out+"</div>";
+  return head+'<div class="money-dash">'+split+mid+cuts+books+mix+out+"</div>";
 }
 function viewBoard(){
   const rows=leads();

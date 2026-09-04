@@ -13,6 +13,7 @@
     let viewI = 0;
     let delivery = "collect";
     let extras = extraFix();
+    let screen = params.get("order") ? "order" : (sku ? "pair" : "grid");
     const types = ["", ...looksOf()];
     const typeBox = document.getElementById("types");
     const grid = document.getElementById("grid");
@@ -29,6 +30,7 @@
     const bagEl = document.getElementById("bag");
     const dock = document.getElementById("dock");
     const dueEl = document.getElementById("due");
+    const backBtn = document.getElementById("back");
     function selected(){ return shoe(sku); }
     function dueOf(p){
       if(!p) return 0;
@@ -93,14 +95,59 @@
       else bag.push(it);
       saveBag();
     }
-    function setQuery(){
+    function setQuery(push){
       const q = new URLSearchParams();
+      if (screen === "order") q.set("order", "1");
       if (type) q.set("type", type);
-      if (sku) q.set("sku", sku);
-      if (size) q.set("size", size);
-      if (hide && hide !== "book") q.set("hide", hide);
+      if (sku && screen !== "grid") q.set("sku", sku);
+      if (screen === "pair") {
+        if (size) q.set("size", size);
+        if (hide && hide !== "book") q.set("hide", hide);
+      }
       const qs = q.toString();
-      history.replaceState(null, "", qs ? ("?"+qs) : location.pathname);
+      const url = qs ? ("?"+qs) : location.pathname;
+      const state = { sable: true, screen: screen };
+      if (push) history.pushState(state, "", url);
+      else history.replaceState(state, "", url);
+    }
+    function applyScreen(){
+      document.body.classList.remove("on-grid", "on-pair", "on-order");
+      document.body.classList.add("on-" + screen);
+      if (backBtn) {
+        backBtn.hidden = screen === "grid";
+        backBtn.textContent = screen === "order" ? "Back" : "Collection";
+      }
+    }
+    function goBack(){
+      if (screen === "order") {
+        if (sku && shoe(sku)) screen = "pair";
+        else {
+          sku = "";
+          size = "";
+          hide = "book";
+          extras = extraFix();
+          screen = "grid";
+        }
+      } else {
+        sku = "";
+        size = "";
+        hide = "book";
+        extras = extraFix();
+        screen = "grid";
+      }
+      draw(true);
+      window.scrollTo(0, 0);
+    }
+    function readQuery(){
+      const q = new URLSearchParams(location.search);
+      type = q.get("type") || "";
+      sku = q.get("sku") || "";
+      size = q.get("size") || "";
+      hide = q.get("hide") || "book";
+      if (!HIDES.some(h => h[0] === hide) && String(hide).indexOf("tt:") !== 0) hide = "book";
+      if (sku && !shoe(sku)) sku = "";
+      screen = q.get("order") ? "order" : (sku ? "pair" : "grid");
+      if (screen === "order" && !bag.length && !thanks) screen = sku ? "pair" : "grid";
     }
     function drawTypes(){
       typeBox.innerHTML = types.map(t =>
@@ -138,8 +185,9 @@
         extras = extraFix();
         const note = document.getElementById("custom-note");
         if (note) note.value = "";
-        draw();
-        ask.scrollIntoView({ behavior: "smooth", block: "start" });
+        screen = "pair";
+        draw(true);
+        window.scrollTo(0, 0);
       });
     }
     function setView(d, abs){
@@ -271,7 +319,7 @@
       dock.hidden = n===0;
       if (n){
         dock.innerHTML = '<span>Order · '+n+'</span><span>'+zar(bagDue())+"</span>";
-        dock.onclick = function(){ orderEl.scrollIntoView({ behavior:"smooth", block:"start" }); };
+        dock.onclick = function(){ screen = "order"; draw(true); window.scrollTo(0, 0); };
       }
       const title = document.getElementById("order-title");
       if (title) title.textContent = n===1 ? "1 pair" : n+" pairs";
@@ -312,7 +360,10 @@
         dueEl.textContent = n ? ("Listed "+zar(bagDue())+ship) : "";
       }
     }
-    function draw(){
+    function draw(push){
+      if (screen === "order" && !bag.length && !thanks) screen = sku ? "pair" : "grid";
+      if (screen === "pair" && !selected()) screen = "grid";
+      applyScreen();
       drawTypes();
       drawGrid();
       drawHero();
@@ -320,7 +371,7 @@
       drawDels();
       drawExtras();
       drawBag();
-      setQuery();
+      setQuery(!!push);
     }
     document.getElementById("custom-note").addEventListener("input", function(){
       extras.customNote = String(this.value || "").trim();
@@ -334,11 +385,14 @@
       thanks = "";
       added.hidden = false;
       added.textContent = bagCount()===1 ? "On the order. Add another pair or send below." : "On the order · "+bagCount()+" pairs.";
-      drawBag();
-      orderEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      screen = "order";
+      draw(true);
+      window.scrollTo(0, 0);
     };
     document.getElementById("more").onclick = function(){
-      grid.scrollIntoView({ behavior: "smooth", block: "start" });
+      screen = "grid";
+      draw(true);
+      window.scrollTo(0, 0);
     };
     document.getElementById("want").addEventListener("submit", async function(e){
       e.preventDefault();
@@ -433,4 +487,14 @@
       const p = shoe(sku);
       if (p) type = type || p.look;
     }
-    draw();
+    if (screen === "order" && !bag.length && !thanks) screen = sku ? "pair" : "grid";
+    if (backBtn) backBtn.onclick = goBack;
+    document.querySelectorAll("[data-back]").forEach(function(b){
+      b.onclick = goBack;
+    });
+    window.addEventListener("popstate", function(){
+      readQuery();
+      draw(false);
+      window.scrollTo(0, 0);
+    });
+    draw(false);

@@ -9,7 +9,7 @@
     let sku = params.get("sku") || "";
     let size = params.get("size") || "";
     let hide = params.get("hide") || "book";
-    if (!HIDES.some(h => h[0] === hide)) hide = "book";
+    if (!HIDES.some(h => h[0] === hide) && String(hide).indexOf("tt:") !== 0) hide = "book";
     let viewI = 0;
     let delivery = "collect";
     let extras = extraFix();
@@ -114,9 +114,9 @@
       });
     }
     function tileHtml(p){
-      return '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+
+      return '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+ 
         '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" loading="lazy" />'+
-        '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+'</p><p class="price">'+zar(p.price)+"</p></div>"+
+        '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(isGolfer(p.look)?" · two-tone":"")+'</p><p class="price">'+zar(p.price)+"</p></div>"+
       "</button>";
     }
     function drawGrid(){
@@ -124,13 +124,16 @@
       const html = groups.map(function(look){
         const rows = PAIRS.filter(p => p.look === look);
         if (!rows.length) return "";
-        return '<section class="cat"><h2>'+look+'</h2><div class="shelf">'+rows.map(tileHtml).join("")+"</div></section>";
+        return '<section class="cat"><h2>'+look+'</h2>'+(isGolfer(look)?'<p class="golf-note">Choose your own two-tone colours</p>':'')+'<div class="shelf">'+rows.map(tileHtml).join("")+"</div></section>";
       }).join("");
       grid.innerHTML = html || '<p class="empty">Nothing in this type.</p>';
       grid.querySelectorAll("[data-sku]").forEach(b => b.onclick = function(){
         sku = b.getAttribute("data-sku") || "";
         const p = selected();
         if (p) type = p.look;
+        if (!p || !isGolfer(p.look)) {
+          if (String(hide).indexOf("tt:")===0) hide = "book";
+        }
         viewI = 0;
         extras = extraFix();
         const note = document.getElementById("custom-note");
@@ -150,21 +153,46 @@
     function drawHero(){
       const p = selected();
       if (!p) { ask.hidden = true; return; }
+      if (!isGolfer(p.look) && String(hide).indexOf("tt:")===0) hide = "book";
       ask.hidden = false;
       const shots = viewsOf(p, hide);
       if (viewI < 0) viewI = shots.length - 1;
       if (viewI >= shots.length) viewI = 0;
       const extra = extraSum(extras, 1);
       const extraBit = extraLabel(extras);
-      hero.innerHTML = turnHtml(p, hide, viewI, extras)+
-        '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+(hide&&hide!=="book"?" · "+hideName(hide):"")+(extraBit?" · "+extraBit:"")+'</p></div>'+
+      const golf = isGolfer(p.look);
+      const hideBit = golf
+        ? (hide && hide!=="book" ? " · "+hideName(hide) : " · two-tone open")
+        : (hide&&hide!=="book"?" · "+hideName(hide):"");
+      const photoHide = golf ? "book" : hide;
+      hero.innerHTML = turnHtml(p, photoHide, viewI, extras)+
+        (golf && hide && hide!=="book" ? toneBadge(hide) : "")+
+        '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+(golf?'<span class="nametag">Two-tone</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+hideBit+(extraBit?" · "+extraBit:"")+'</p></div>'+
         '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">This pair'+(extra?" + extras":"")+"</p></div></div>"+
-        '<label style="margin:10px 14px 0">Hide</label>'+
-        '<div class="hides">'+hideChips(hide,"data-whide")+"</div>"+
-        '<p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>';
+        (golf
+          ? ('<label style="margin:10px 14px 0">Two-tone</label>'+golfToneHtml(hide,"data-whide")+'<p class="hint">Body and vamp. Golfers only. The photo stays the last in the book — hide is cut to the two colours you pick.</p>')
+          : ('<label style="margin:10px 14px 0">Hide</label><div class="hides">'+hideChips(hide,"data-whide")+'</div><p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>'));
       hookTurn(setView);
       hero.querySelectorAll("[data-whide]").forEach(b => b.onclick = function(){
         hide = b.getAttribute("data-whide") || "book";
+        viewI = 0;
+        drawHero();
+        setQuery();
+      });
+      hero.querySelectorAll("[data-tbody]").forEach(b => b.onclick = function(){
+        const a = b.getAttribute("data-tbody") || "white";
+        const t = parseTone(hide);
+        const vamp = t.book ? "white" : (t.b || a);
+        hide = toneId(a, vamp);
+        viewI = 0;
+        drawHero();
+        setQuery();
+      });
+      hero.querySelectorAll("[data-tvamp]").forEach(b => b.onclick = function(){
+        const vamp = b.getAttribute("data-tvamp") || "white";
+        const t = parseTone(hide);
+        const body = t.book ? "white" : (t.a || "white");
+        hide = toneId(body, vamp);
         viewI = 0;
         drawHero();
         setQuery();

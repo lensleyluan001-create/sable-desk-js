@@ -62,7 +62,9 @@ function toneBadge(id){
   return '<div class="tone-badge"><span class="sw duo"><i style="background:'+toneSwatch(t.a)+'"></i><i style="background:'+toneSwatch(t.b)+'"></i></span>'+hideName(id)+"</div>";
 }
 
-function golf3dUrl(sku){ return "/golf/"+sku+".jpg"; }
+function golf3dUrl(sku){
+  return "https://cdn.jsdelivr.net/gh/lensleyluan001-create/sable-looks@fa82e44/golf3d/"+sku+".jpg";
+}
 function hexRgb(h){
   h=String(h||"").replace("#","");
   if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
@@ -77,7 +79,12 @@ function loadGolf3d(sku, done){
   im.onerror=function(){
     if(im.dataset.try!=="gh"){
       im.dataset.try="gh";
-      im.src="https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/main/golf3d/"+sku+".jpg";
+      im.src="https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/fa82e441854c243e886f11db1abbab9304827373/golf3d/"+sku+".jpg";
+      return;
+    }
+    if(im.dataset.try!=="local"){
+      im.dataset.try="local";
+      im.src="/golf/"+sku+".jpg";
       return;
     }
     done(null);

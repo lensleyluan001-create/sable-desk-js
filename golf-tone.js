@@ -1,6 +1,46 @@
-const TONE_COLS=[["white","White"],["stone","Stone"],["red","Red"],["olive","Olive"],["navy","Navy"],["teal","Teal"],["pink","Pink"],["wine","Wine"],["cream","Cream"],["sky","Sky"],["brown","Brown"],["tan","Tan"]];
-const TONE_SWATCH={white:"#f3eee6",stone:"#b7a89a",red:"#b4232a",olive:"#5c6848",navy:"#1e3a5f",teal:"#1f6f6a",pink:"#d4a3a0",wine:"#7a1f2b",cream:"#eadcc4",sky:"#6e8aa8",brown:"#5a3a28",tan:"#c4a574"};
-const GOLF_PRESETS=[["book","Book"],["tt:white-stone","White / Stone"],["tt:white-red","White / Red"],["tt:white-olive","White / Olive"],["tt:navy-navy","Navy"],["tt:tan-teal","Tan / Teal"],["tt:white-pink","White / Pink"],["tt:cream-wine","Cream / Wine"],["tt:pink-cream","Pink / Cream"],["tt:white-navy","White / Navy"],["tt:white-sky","White / Sky"],["tt:white-brown","White / Brown"],["tt:tan-tan","Tan"]];
+const TONE_COLS=[["white","White"],["stone","Stone"],["red","Red"],["olive","Olive"],["navy","Navy"],["teal","Teal"],["pink","Pink"],["wine","Wine"],["cream","Cream"],["sky","Sky"],["brown","Brown"],["tan","Tan"],["leopard","Leopard"]];
+const TONE_SWATCH={white:"#f3eee6",stone:"#b7a89a",red:"#b4232a",olive:"#5c6848",navy:"#1e3a5f",teal:"#1f6f6a",pink:"#d4a3a0",wine:"#7a1f2b",cream:"#eadcc4",sky:"#6e8aa8",brown:"#5a3a28",tan:"#c4a574",leopard:"#8a5a2b"};
+const GOLF_PRESETS=[
+  ["book","Book"],
+  ["tt:white-stone","White / Stone"],
+  ["tt:white-red","White / Red"],
+  ["tt:white-olive","White / Olive"],
+  ["tt:navy-navy","Navy"],
+  ["tt:tan-teal","Tan / Teal"],
+  ["tt:white-pink","White / Pink"],
+  ["tt:cream-wine","Cream / Wine"],
+  ["tt:pink-cream","Pink / Cream"],
+  ["tt:white-navy","White / Navy"],
+  ["tt:white-sky","White / Sky"],
+  ["tt:white-brown","White / Brown"],
+  ["tt:tan-tan","Tan"],
+  ["tt:white-white","White"],
+  ["tt:pink-pink","Pink"],
+  ["tt:white-leopard","White / Leopard"],
+  ["tt:brown-white","Brown / White"],
+  ["tt:wine-cream","Wine / Cream"],
+  ["tt:tan-sky","Tan / Sky"]
+];
+const TONE_PHOTO={
+  "tt:white-stone":"/golf/tt/white-stone.jpg",
+  "tt:white-red":"/golf/tt/white-red.jpg",
+  "tt:white-olive":"/golf/tt/white-olive.jpg",
+  "tt:navy-navy":"/golf/tt/navy-navy.jpg",
+  "tt:tan-teal":"/golf/tt/tan-teal.jpg",
+  "tt:white-pink":"/golf/tt/white-pink.jpg",
+  "tt:cream-wine":"/golf/tt/cream-wine.jpg",
+  "tt:pink-cream":"/golf/tt/pink-cream.jpg",
+  "tt:white-navy":"/golf/tt/white-navy.jpg",
+  "tt:white-sky":"/golf/tt/white-sky.jpg",
+  "tt:white-brown":"/golf/tt/white-brown.jpg",
+  "tt:tan-tan":"/golf/tt/tan-tan.jpg",
+  "tt:white-white":"/golf/tt/white-white.jpg",
+  "tt:pink-pink":"/golf/tt/pink-pink.jpg",
+  "tt:white-leopard":"/golf/tt/white-leopard.jpg",
+  "tt:brown-white":"/golf/tt/brown-white.jpg",
+  "tt:wine-cream":"/golf/tt/wine-cream.jpg",
+  "tt:tan-sky":"/golf/tt/tan-sky.jpg"
+};
 function isGolfer(look){return /^golfer$/i.test(String(look||"").trim())}
 function parseTone(id){
   id=String(id||"book");
@@ -18,6 +58,21 @@ function toneId(a,b){
   return "tt:"+a+"-"+b;
 }
 function toneSwatch(id){return TONE_SWATCH[id]||HIDE_SWATCH[id]||"#8a7a68"}
+function golfPhoto(id){
+  const t=parseTone(id);
+  if(t.book) return "";
+  const local=TONE_PHOTO[t.id];
+  if(!local) return "";
+  return local;
+}
+function golfPhotoCdn(id){
+  const t=parseTone(id);
+  if(t.book) return "";
+  const local=TONE_PHOTO[t.id];
+  if(!local) return "";
+  const name=local.split("/").pop();
+  return "https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/228b3ecc0b399b23dc209db335889c7fc4a708d6/golf/tt/"+name;
+}
 const _hideName=hideName;
 hideName=function(id){
   const t=parseTone(id);
@@ -42,7 +97,7 @@ function golfToneHtml(on,attr){
     const sel=(id==="book"&&t.book)||(!pt.book&&t.id===pt.id);
     return '<button class="hide tone'+(sel?" on":"")+'" type="button" '+attr+'="'+id+'" title="'+lab+'"><span class="sw duo"><i style="background:'+a+'"></i><i style="background:'+b+'"></i></span>'+lab+"</button>";
   }).join("");
-  const body=TONE_COLS.map(function(row){
+  const body=TONE_COLS.filter(function(row){return row[0]!=="leopard"}).map(function(row){
     const id=row[0], lab=row[1];
     const sel=!t.book&&t.a===id;
     return '<button class="hide'+(sel?" on":"")+'" type="button" data-tbody="'+id+'" title="'+lab+'"><span class="sw" style="background:'+toneSwatch(id)+'"></span>'+lab+"</button>";
@@ -61,94 +116,8 @@ function toneBadge(id){
   if(t.book) return "";
   return '<div class="tone-badge"><span class="sw duo"><i style="background:'+toneSwatch(t.a)+'"></i><i style="background:'+toneSwatch(t.b)+'"></i></span>'+hideName(id)+"</div>";
 }
-
-function golf3dUrl(sku){
-  return "https://cdn.jsdelivr.net/gh/lensleyluan001-create/sable-looks@fa82e44/golf3d/"+sku+".jpg";
+function golfTurnHtml(sku, hide){
+  const src=golfPhotoCdn(hide)||golfPhoto(hide)||("/golf/"+sku+".jpg");
+  return '<div class="turn" data-look="golfer"><div class="stage"><img src="'+src+'" alt="'+(sku||"")+' '+hideName(hide)+'" draggable="false" /></div></div>';
 }
-function hexRgb(h){
-  h=String(h||"").replace("#","");
-  if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
-  return [parseInt(h.slice(0,2),16)||0, parseInt(h.slice(2,4),16)||0, parseInt(h.slice(4,6),16)||0];
-}
-const golfImgCache={};
-function loadGolf3d(sku, done){
-  if(golfImgCache[sku] && golfImgCache[sku].complete && golfImgCache[sku].naturalWidth){ done(golfImgCache[sku]); return; }
-  const im=new Image();
-  im.crossOrigin="anonymous";
-  im.onload=function(){ golfImgCache[sku]=im; done(im); };
-  im.onerror=function(){
-    if(im.dataset.try!=="gh"){
-      im.dataset.try="gh";
-      im.src="https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/fa82e441854c243e886f11db1abbab9304827373/golf3d/"+sku+".jpg";
-      return;
-    }
-    if(im.dataset.try!=="local"){
-      im.dataset.try="local";
-      im.src="/golf/"+sku+".jpg";
-      return;
-    }
-    done(null);
-  };
-  im.src=golf3dUrl(sku);
-}
-function paintGolfCanvas(canvas, img, bodyHex, vampHex){
-  const w=img.naturalWidth, h=img.naturalHeight;
-  if(!w||!h) return;
-  canvas.width=w; canvas.height=h;
-  const ctx=canvas.getContext("2d");
-  ctx.drawImage(img,0,0);
-  const data=ctx.getImageData(0,0,w,h);
-  const p=data.data;
-  const upper=new Uint8Array(w*h);
-  let x0=w,y0=h,x1=0,y1=0,n=0;
-  for(let i=0,j=0;i<p.length;i+=4,j++){
-    const r=p[i],g=p[i+1],b=p[i+2];
-    const lum=(r+g+b)/3;
-    if(Math.abs(r-g)<32 && Math.abs(g-b)<42 && Math.abs(r-b)<48 && lum>100 && lum<245){
-      upper[j]=1; n++;
-      const x=j%w, y=(j/w)|0;
-      if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
-    }
-  }
-  if(n<80) return;
-  const sw=Math.max(1,x1-x0), sh=Math.max(1,y1-y0);
-  const bc=hexRgb(bodyHex), vc=hexRgb(vampHex);
-  for(let y=0;y<h;y++){
-    for(let x=0;x<w;x++){
-      const j=y*w+x;
-      if(!upper[j]) continue;
-      const relx=(x-x0)/sw, rely=(y-y0)/sh;
-      const vamp=relx>0.50 && (relx+0.18*rely)>0.58;
-      const c=vamp?vc:bc;
-      const i=j*4;
-      const lum=(p[i]+p[i+1]+p[i+2])/3/255;
-      const scale=Math.max(0.18, Math.min(1.22, lum/0.70));
-      p[i]=Math.max(0,Math.min(255, c[0]*scale));
-      p[i+1]=Math.max(0,Math.min(255, c[1]*scale));
-      p[i+2]=Math.max(0,Math.min(255, c[2]*scale));
-    }
-  }
-  ctx.putImageData(data,0,0);
-}
-function paintGolfEl(canvas, sku, hideId){
-  if(!canvas) return;
-  const t=parseTone(hideId);
-  if(t.book) return;
-  const body=toneSwatch(t.a||"white");
-  const vamp=toneSwatch(t.b||t.a||"white");
-  loadGolf3d(sku, function(img){
-    if(!img){
-      const p=typeof shoe==="function"?shoe(sku):null;
-      if(p&&p.img&&canvas.parentNode){
-        const el=document.createElement("img");
-        el.src=p.img; el.alt=sku+" "+hideName(hideId);
-        canvas.replaceWith(el);
-      }
-      return;
-    }
-    paintGolfCanvas(canvas, img, body, vamp);
-  });
-}
-function golfTurnHtml(sku){
-  return '<div class="turn golf-3d" data-look="golfer"><div class="stage"><canvas id="golf-3d" class="golf-canvas" aria-label="Two-tone golfer"></canvas></div></div>';
-}
+function paintGolfEl(){}

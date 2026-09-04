@@ -214,15 +214,14 @@
         : (hide&&hide!=="book"?" · "+hideName(hide):"");
       const photoHide = golf ? "book" : hide;
       const use3d = golf && hide && hide!=="book";
-      hero.innerHTML = (use3d ? golfTurnHtml(p.sku) : turnHtml(p, photoHide, viewI, extras))+
+      hero.innerHTML = (use3d ? golfTurnHtml(p.sku, hide) : turnHtml(p, photoHide, viewI, extras))+
         (use3d ? toneBadge(hide) : "")+
         '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+(golf?'<span class="nametag">Two-tone</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+hideBit+(extraBit?" · "+extraBit:"")+'</p></div>'+
         '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">This pair'+(extra?" + extras":"")+"</p></div></div>"+
         (golf
-          ? ('<label style="margin:10px 14px 0">Two-tone</label>'+golfToneHtml(hide,"data-whide")+'<p class="hint">Body and vamp. Golfers only. The picture recolors to the two colours you pick.</p>')
+          ? ('<label style="margin:10px 14px 0">Two-tone</label>'+golfToneHtml(hide,"data-whide")+'<p class="hint">Body and vamp. Golfers only. The picture is the pair in that colour — saddle and vamp, not a straight split.</p>')
           : ('<label style="margin:10px 14px 0">Hide</label><div class="hides">'+hideChips(hide,"data-whide")+'</div><p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>'));
-      if (use3d) paintGolfEl(document.getElementById("golf-3d"), p.sku, hide);
-      else hookTurn(setView);
+      if (!use3d) hookTurn(setView);
       hero.querySelectorAll("[data-whide]").forEach(b => b.onclick = function(){
         hide = b.getAttribute("data-whide") || "book";
         viewI = 0;

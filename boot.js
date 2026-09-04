@@ -262,7 +262,8 @@ function hookDesk(){
     const qty=Number(b.getAttribute("data-pqty")||1)||1;
     const l=S.leads.find(x=>x.id===personId)||{};
     const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{qty}):it});
-    patchLead(personId,{qty,items});
+    const next=Object.assign({},l,{qty,items});
+    patchLead(personId,lockListed(next,itemListedSum(items)));
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
@@ -292,7 +293,8 @@ function hookDesk(){
     const pair=shoe(psku.value);
     const l=S.leads.find(x=>x.id===personId)||{};
     const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,listed:pair?pair.price:0}):it});
-    patchLead(personId,{sku:psku.value,look:pair?pair.look:"",listedPrice:null,items});
+    const next=Object.assign({},l,{sku:psku.value,look:pair?pair.look:"",items,listedPrice:null});
+    patchLead(personId,Object.assign({sku:psku.value,look:pair?pair.look:""},lockListed(next,bookListed(next))));
     pairView=0;
     draw();
   };
@@ -305,9 +307,8 @@ function hookDesk(){
   if(pprice) pprice.onchange=function(){
     if(!personId) return;
     const l=S.leads.find(x=>x.id===personId);
-    const pair=shoe(l&&l.sku);
     const n=Number(String(pprice.value||"").replace(/[^\d]/g,""))||0;
-    patchLead(personId,{listedPrice:pair&&n===pair.price?null:(n||null)});
+    patchLead(personId,lockListed(l,n));
     draw();
   };
   hookExtras("cap",function(){return cap.extras},function(ex,quiet){
@@ -364,6 +365,12 @@ function hookDesk(){
       const fields={nextAction:next,nextActionAt:at,note};
       if(name) fields.name=name;
       if(phone) fields.phone=phone;
+      const pprice=document.getElementById("p-price");
+      if(pprice){
+        const l=S.leads.find(x=>x.id===personId);
+        const n=Number(String(pprice.value||"").replace(/[^\d]/g,""))||0;
+        Object.assign(fields,lockListed(l,n));
+      }
       patchLead(personId,fields);
       toast="Saved.";
       draw();

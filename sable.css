@@ -514,6 +514,16 @@
     .money .price-edit input {
       width: 120px; font-size: 16px; padding: 6px 10px;
     }
+    .price-mismatch {
+      display: inline-flex; align-items: center;
+      letter-spacing: .14em; text-transform: uppercase;
+      font-size: 9px; font-weight: 600; line-height: 1;
+      padding: 5px 8px 4px; border-radius: 2px;
+      background: var(--hot); color: #fff;
+      vertical-align: 2px; margin-left: 8px;
+    }
+    .price-mismatch-row { margin: 0 0 8px; }
+    .price-mismatch-row .price-mismatch { margin-left: 0; }
     .type-row {
       flex-wrap: nowrap;
       overflow-x: auto;

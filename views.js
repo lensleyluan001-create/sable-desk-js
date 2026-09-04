@@ -122,7 +122,7 @@ function viewMoney(rows){
     "</div>";
   const wait=m.outstanding.length
     ? m.outstanding.slice(0,8).map(function(o){
-        return '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>";
+        return '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+mismatchBadge(rows.find(function(x){return x.id===o.id})||{})+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>";
       }).join("")
     : '<p class="meta">None waiting.</p>';
   const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
@@ -142,7 +142,7 @@ function viewBoard(){
     const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([t.qty>1?(t.qty+" pairs"):"",l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
+    return '<div class="lead"><div class="lead-row">'+(p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':'<div></div>')+'<div><div class="spread"><p class="name">'+esc(l.name||"No name")+nametag(l)+mismatchBadge(l)+'</p><p class="meta">'+(houseView()&&l.owner?SL[l.owner]:"")+(l.salesman?" · "+esc(l.salesman):"")+'</p></div><p class="meta">'+esc([t.qty>1?(t.qty+" pairs"):"",l.sku,l.look,l.size?("UK "+l.size):"",zar(t.listed)].filter(Boolean).join(" · "))+'</p><p class="meta">Next · '+esc(next)+(ago?" · last "+ago:"")+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+(!l.owner&&houseView()?'<button class="chip" type="button" data-take="'+l.id+'">Take</button>':"")+'</div></div></div></div>';
   }
   if(pane==="money"&&seeCost()) return viewMoney(rows);
   const colHtml=cols.map(([id,label])=>'<section><p class="kicker">'+label+' · '+grouped[id].length+'</p>'+(grouped[id].map(card).join("")||'<p class="empty">Clear.</p>')+"</section>").join("");
@@ -208,7 +208,7 @@ function viewPerson(){
   const stages=[["new","New"],["contacted","Working"],["closed","Closed"],["lost","Lost"]];
   const age=l.updatedAt||l.createdAt;
   const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
-  const profit=p&&seeCost()?Math.max(0,(unitListed(l)-p.cost)*t.qty):null;
+  const profit=seeCost()?Math.max(0,t.listed-pairCostOf(l)):null;
   const waFirst=wa(l.phone,firstMsg(l));
   const waSize=wa(l.phone,sizeMsg(l));
   const waPay=wa(l.phone,payMsg(l));
@@ -221,7 +221,7 @@ function viewPerson(){
   const delChips=[["collect","Collect"],["local","Local R100"],["int","International R300"]].map(([id,lab])=>'<button class="chip '+(l.delivery===id?"on":"")+'" type="button" data-pdel="'+id+'">'+lab+"</button>").join("");
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
-  const money='<div class="money card"><div class="line"><span>'+(t.custom?"Custom pair":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+unitListed(l)+'" aria-label="Pair price" /></span></div>'+(p&&t.custom&&unitListed(l)!==p.price?'<div class="line"><span>Book</span><span>'+zar(p.price)+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
+  const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
   const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button>'+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){

@@ -193,11 +193,13 @@ function hookDesk(){
     const priceEl=document.getElementById("cap-price");
     const typed=Number(String((f.listedPrice!=null&&f.listedPrice!==""?f.listedPrice:(priceEl&&priceEl.value)||"")).replace(/[^\d]/g,""))||0;
     const listedPrice=typed&&typed!==p.price?typed:null;
+    const extras=extraFix(cap.extras);
+    const items=[{sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,colour:cap.colour||"book",extras:extras,listedPrice:listedPrice,listed:listedPrice||p.price}];
     const lead=leadFix({
-      id:uid(),name:cap.name,phone:cap.phone,sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,
+      id:uid(),name:cap.name,phone:cap.phone,sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,items,
       source:cap.source,status:"new",note:cap.note,owner:houseView()?cap.owner:mySeller(),
       delivery:cap.delivery,deliveryFee:feeOf(cap.delivery),colour:cap.colour||"book",
-      extras:extraFix(cap.extras),listedPrice,
+      extras:extras,listedPrice,
       createdAt:Date.now()
     });
     S.leads.unshift(lead);
@@ -318,10 +320,15 @@ function hookDesk(){
   });
   hookExtras("p",function(){
     const l=S.leads.find(x=>x.id===personId);
-    return l&&l.extras;
+    if(!l) return extraFix();
+    const first=(itemsOf(l)[0])||{};
+    return first.extras||l.extras;
   },function(ex,quiet){
     if(!personId) return;
-    patchLead(personId,{extras:extraFix(ex)});
+    const l=S.leads.find(x=>x.id===personId)||{};
+    const extras=extraFix(ex);
+    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{extras:extras}):it});
+    patchLead(personId,{extras:extras,items:items});
     if(!quiet) draw();
   });
   hookTurn(function(d,abs){

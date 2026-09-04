@@ -118,11 +118,20 @@ function lockListedFromLead(l){
   else total=book;
   return lockListed(Object.assign({},l,{items:items}),total);
 }
+function extraScore(e){
+  e=extraFix(e);
+  return (e.laser?1:0)+(e.laces?1:0)+(e.stitch?1:0)+(e.custom?1:0)+Number(e.customFee||0);
+}
+function extraPick(a,b){
+  return extraScore(a)>=extraScore(b)?extraFix(a):extraFix(b);
+}
 function leadFix(l){
   l=l&&typeof l==="object"?l:{};
   const locked=lockListedFromLead(l);
-  const items=locked.items;
+  let items=locked.items;
   const first=items[0]||itemFix({});
+  const extras=extraPick(l.extras,first.extras);
+  if(items.length) items=items.map(function(it,i){return i===0?Object.assign({},it,{extras:extras}):it});
   const p=shoe(l.sku||first.sku);
   const miss=items.some(it=>!it.size);
   return {
@@ -144,7 +153,7 @@ function leadFix(l){
     delivery:l.delivery||"collect",
     deliveryFee:Number(l.deliveryFee||0)||0,
     colour:first.colour||l.colour||"book",
-    extras:extraFix(first.extras||l.extras),
+    extras,
     listedPrice:locked.listedPrice,
     nextAction:l.nextAction||l.next||"",
     nextActionAt:l.nextActionAt||null,

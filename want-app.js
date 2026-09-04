@@ -114,7 +114,7 @@
       });
     }
     function tileHtml(p){
-      return '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+ 
+      return '<button class="tile '+(p.sku===sku?"on":"")+'" type="button" data-sku="'+p.sku+'">'+
         '<img src="'+p.img+'" alt="'+p.sku+" "+p.look+'" loading="lazy" />'+
         '<div class="pad"><p class="stock">'+p.sku+'</p><p class="meta">'+p.look+(isGolfer(p.look)?" · two-tone":"")+'</p><p class="price">'+zar(p.price)+"</p></div>"+
       "</button>";
@@ -165,14 +165,16 @@
         ? (hide && hide!=="book" ? " · "+hideName(hide) : " · two-tone open")
         : (hide&&hide!=="book"?" · "+hideName(hide):"");
       const photoHide = golf ? "book" : hide;
-      hero.innerHTML = turnHtml(p, photoHide, viewI, extras)+
-        (golf && hide && hide!=="book" ? toneBadge(hide) : "")+
+      const use3d = golf && hide && hide!=="book";
+      hero.innerHTML = (use3d ? golfTurnHtml(p.sku) : turnHtml(p, photoHide, viewI, extras))+
+        (use3d ? toneBadge(hide) : "")+
         '<div class="pad"><div><p class="stock">'+p.sku+(extras.custom?'<span class="nametag">Custom</span>':"")+(golf?'<span class="nametag">Two-tone</span>':"")+'</p><p class="meta">'+p.look+(size?" · UK "+size:" · size open")+hideBit+(extraBit?" · "+extraBit:"")+'</p></div>'+
         '<div><p class="price">'+zar(dueOf(p))+'</p><p class="kicker">This pair'+(extra?" + extras":"")+"</p></div></div>"+
         (golf
-          ? ('<label style="margin:10px 14px 0">Two-tone</label>'+golfToneHtml(hide,"data-whide")+'<p class="hint">Body and vamp. Golfers only. The photo stays the last in the book — hide is cut to the two colours you pick.</p>')
+          ? ('<label style="margin:10px 14px 0">Two-tone</label>'+golfToneHtml(hide,"data-whide")+'<p class="hint">Body and vamp. Golfers only. The picture recolors to the two colours you pick.</p>')
           : ('<label style="margin:10px 14px 0">Hide</label><div class="hides">'+hideChips(hide,"data-whide")+'</div><p class="hint">As photographed is the pair in the book. Other hides are a last preview, subject to tannery hide.</p>'));
-      hookTurn(setView);
+      if (use3d) paintGolfEl(document.getElementById("golf-3d"), p.sku, hide);
+      else hookTurn(setView);
       hero.querySelectorAll("[data-whide]").forEach(b => b.onclick = function(){
         hide = b.getAttribute("data-whide") || "book";
         viewI = 0;

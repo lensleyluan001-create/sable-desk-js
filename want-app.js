@@ -1,7 +1,7 @@
     const HOUSE_MAIL = "lensleyluan001@gmail.com";
     const BAG_KEY = "sable-want-bag-v1";
     function zar(n){ if(n==null||n==="") return "POA"; return "R"+Number(n).toLocaleString("en-ZA"); }
-    function feeOf(d){ return d==="local"?100:d==="int"?300:0; }
+    function feeOf(d){ return d==="local"?150:d==="int"?0:0; }
     function digits(p){ return String(p||"").replace(/\D/g,""); }
     function uidLine(){ return "ln-"+Math.random().toString(36).slice(2,8); }
     const params = new URLSearchParams(location.search);
@@ -289,7 +289,7 @@
       });
     }
     function drawDels(){
-      const opts = [["collect","Collect"],["local","Local R100"],["int","International R300"]];
+      const opts = [["collect","Collect"],["local","Delivery R150"],["int","Too far · quoted"]];
       dels.innerHTML = opts.map(([id,lab]) =>
         '<button class="chip '+(delivery===id?"on":"")+'" type="button" data-del="'+id+'">'+lab+"</button>"
       ).join("");

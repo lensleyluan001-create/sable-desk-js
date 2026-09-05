@@ -248,6 +248,7 @@ let personId=null;
 let cap={sku:"45015",name:"",phone:"",size:"",qty:1,source:"whatsapp",note:"",delivery:"collect",owner:"luan",type:"",colour:"book",view:0,extras:extraFix(),listedPrice:null};
 let pairView=0;
 let invView=false;
+let waPick=null;
 let lastCapId=null;
 let navOpen=localStorage.getItem("sable-nav-v1")==="open";
 function setNavOpen(on){
@@ -263,7 +264,7 @@ function house(){
 }
 function enter(u){
   S.session={email:u.email,name:u.name||LUAN.name,role:u.role||"sales",seller:u.seller||"luan"};
-  toast="";tab="desk";personId=null;
+  toast="";tab="desk";personId=null;waPick=null;
   if(houseView()){
     const saved=readDesk();
     deskFilter=SELLERS.indexOf(saved)>=0?saved:(u.seller||"luan");
@@ -725,6 +726,117 @@ function todoWaText(it){
   if(it.kind==="size") return sizeMsg(l);
   return "";
 }
+function canChaseDraft(l){
+  if(!l) return false;
+  if(l.status==="lost") return false;
+  if(l.status==="closed"&&l.paid) return false;
+  return true;
+}
+function wantsCustomerDraft(l){
+  if(!canChaseDraft(l)) return false;
+  if(nextActionClose(l)) return false;
+  const t=nextTodo(l);
+  if(!t||t.kind==="close"||t.kind==="take") return false;
+  return !!(t.wa||t.kind==="pay"||t.kind==="whatsapp"||t.kind==="size"||t.kind==="follow");
+}
+function customerDraftText(l,kind){
+  if(!l) return "";
+  const k=kind||((nextTodo(l)||{}).kind);
+  if(k==="whatsapp") return firstMsg(l);
+  if(k==="follow") return followMsg(l);
+  if(k==="pay") return invMsg(l);
+  if(k==="size") return sizeMsg(l);
+  if(l.status==="new"||l.status==="inbox") return firstMsg(l);
+  if(!l.size) return sizeMsg(l);
+  if(!l.paid) return invMsg(l);
+  return followMsg(l);
+}
+function draftReason(l){
+  const t=nextTodo(l);
+  const sla=slaOf(t,l);
+  if(sla.paySla||(t&&t.kind==="pay")) return "Unpaid EFT";
+  if(sla.needsLuan) return "Needs Luan";
+  if(sla.escalateStaff) return "SLA sitting over 2 hours";
+  if(!String((l&&l.nextAction)||"").trim()) return "No next step";
+  return todoVerb(t)||"Needs a look";
+}
+function staffEscalateMsg(l,reason){
+  l=l||{};
+  const t=ticket(l);
+  const book=bookOf(l);
+  const who=SL[book]||book||"Floor";
+  const sku=[l.sku,l.look,l.size?("UK "+l.size):""].filter(Boolean).join(" ");
+  const due=t&&t.due?zar(t.due):"";
+  const age=sitLabel(sitMs(l));
+  const why=String(reason||"").trim()||draftReason(l);
+  return who+", floor ping on "+(l.name||"this ticket")+(sku?(" · "+sku):"")+(due?(" · due "+due):"")+". "+why+" · sitting "+age+". Action the desk. Staff only — do not send this to the client.";
+}
+function waDrafts(l,opt){
+  opt=opt||{};
+  const out={
+    customer:{ok:false,href:"",miss:"",text:""},
+    seller:{ok:false,href:"",miss:"",who:"Salesperson",text:""},
+    luan:{ok:false,href:"",miss:"",text:""}
+  };
+  if(!canChaseDraft(l)) return out;
+  const reason=opt.reason||draftReason(l);
+  const staffText=staffEscalateMsg(l,reason);
+  out.seller.text=staffText;
+  out.luan.text=staffText;
+  if(wantsCustomerDraft(l)){
+    const text=customerDraftText(l,opt.kind);
+    out.customer.text=text;
+    if(digits(l.phone).length<9) out.customer.miss="No phone on ticket";
+    else{
+      out.customer.href=wa(l.phone,text);
+      out.customer.ok=!!out.customer.href;
+    }
+  }else out.customer.miss="Not a customer chase";
+  const book=bookOf(l);
+  out.seller.who=book?(SL[book]||book):"Salesperson";
+  if(!book) out.seller.miss="No owner on ticket";
+  else if(!staffPhoneOf(book)) out.seller.miss="Add staff WhatsApp in Team";
+  else{
+    out.seller.href=wa(staffPhoneOf(book),staffText);
+    out.seller.ok=!!out.seller.href;
+  }
+  if(!staffPhoneOf("luan")) out.luan.miss="Add staff WhatsApp in Team";
+  else{
+    out.luan.href=wa(staffPhoneOf("luan"),staffText);
+    out.luan.ok=!!out.luan.href;
+  }
+  return out;
+}
+function waPickChip(label,href,miss,extra){
+  extra=extra||"";
+  if(href) return '<a class="chip on" href="'+href+'" target="_blank" rel="noreferrer"'+extra+">"+esc(label)+"</a>";
+  return '<span class="wa-opt"><span class="chip is-off">'+esc(label)+"</span>"+(miss?'<p class="meta wa-miss">'+esc(miss)+"</p>":"")+"</span>";
+}
+function waPickerHtml(l,opt){
+  opt=opt||{};
+  if(!l||!canChaseDraft(l)) return "";
+  const open=waPick===l.id;
+  const cls=opt.primary===false?"chip":"solid tight";
+  const btn=open
+    ? '<button class="ghost tight" type="button" data-waclose="'+l.id+'">Close draft</button>'
+    : '<button class="'+cls+'" type="button" data-wapick="'+l.id+'">Draft WhatsApp</button>';
+  if(!open) return btn;
+  const d=waDrafts(l,opt);
+  const custExtra=(d.customer.ok&&opt.wadone?' data-wadone="'+esc(opt.wadone)+'"':"")+(d.customer.ok&&opt.markNew?' data-wa="'+l.id+'"':"");
+  const teamNeed=d.seller.miss==="Add staff WhatsApp in Team"||d.luan.miss==="Add staff WhatsApp in Team";
+  const team=teamNeed
+    ?(houseView()?'<button class="chip" type="button" data-tab="team">Add staff WhatsApp in Team</button>':'<p class="meta wa-miss">Add staff WhatsApp in Team</p>')
+    :"";
+  return btn+'<div class="wa-sheet" data-washeet="'+l.id+'">'+
+    '<p class="kicker">Draft WhatsApp</p>'+
+    '<p class="meta">Draft ready — you send. Nothing sends itself.</p>'+
+    '<div class="row">'+
+      waPickChip("Customer",d.customer.href,d.customer.miss,custExtra)+
+      waPickChip("Salesperson",d.seller.href,d.seller.miss)+
+      waPickChip("Luan",d.luan.href,d.luan.miss)+
+    "</div>"+team+
+  "</div>";
+}
 function todoVerb(it){
   if(!it) return "";
   if(it.kind==="close") return it.step&&it.step!=="EFT is in"?it.step:"Close the sale";
@@ -822,25 +934,26 @@ function slaCta(it){
 function todoCta(it){
   const l=it.lead;
   if(!l) return "";
-  const href=it.wa?wa(l.phone,todoWaText(it)):"";
+  const draft=canChaseDraft(l)?waPickerHtml(l,{
+    primary:it.kind!=="pay",
+    kind:it.kind,
+    wadone:it.done&&it.wa?it.id:"",
+    reason:todoVerb(it)
+  }):"";
   let out="";
   if(it.kind==="close") out='<button class="solid tight" type="button" data-done="'+esc(it.id)+'">Mark closed</button>';
   else if(it.kind==="take") out='<button class="solid tight" type="button" data-take="'+l.id+'">Take onto my book</button>';
   else if(it.kind==="size"){
-    const ask=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp size</a>':"";
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
-    out=ask+sizes+todoPendBtn(l,it);
+    out=draft+sizes+todoPendBtn(l,it);
   }else if(it.kind==="pay"){
     out='<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
-      (href?'<a class="ghost" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp EFT</a>':"")+
+      draft+
       '<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
-  }else if(href){
-    const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
-    out='<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>"+todoPendBtn(l,it);
   }else{
-    out='<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+todoPendBtn(l,it);
+    out=(draft||'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>')+todoPendBtn(l,it);
   }
-  return out+slaCta(it);
+  return out;
 }
 function todoPendBtn(l,it){
   if(!l||!it||it.kind==="close"||it.kind==="take"||it.lane==="wait") return "";
@@ -1144,7 +1257,12 @@ function buildStandup(){
 function standupCta(kind,row){
   const l=row&&row.lead;
   if(!l) return "";
-  if(kind==="unpaid") return '<button class="solid tight" type="button" data-todopaid="'+l.id+'">Confirm paid</button>';
-  return '<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+  const draft=canChaseDraft(l)?waPickerHtml(l,{
+    primary:kind!=="unpaid",
+    kind:kind==="unpaid"?"pay":(row.todo&&row.todo.kind),
+    reason:row.why||draftReason(l)
+  }):"";
+  if(kind==="unpaid") return draft+'<button class="solid tight" type="button" data-todopaid="'+l.id+'">Confirm paid</button>';
+  return draft+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
 }
 

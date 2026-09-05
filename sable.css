@@ -924,6 +924,26 @@
     .stand-row.hot { box-shadow: 0 0 0 2px var(--hot), var(--shadow); }
     .stand-why { margin: 0; }
     .stand-row .solid { min-height: 44px; }
+    .wa-sheet {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 14px 14px;
+      background: var(--elev);
+      border-radius: 14px;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+    .wa-sheet .kicker { margin-bottom: 4px; }
+    .wa-sheet .row { margin-top: 10px; }
+    .wa-sheet .chip { min-height: 44px; display: inline-flex; align-items: center; }
+    .wa-opt { display: flex; flex-direction: column; gap: 4px; }
+    .chip.is-off {
+      opacity: .45;
+      pointer-events: none;
+    }
+    .wa-miss { margin: 4px 0 0; width: 100%; }
+    .m-wait-row { border-top: 1px solid var(--line); padding-bottom: 8px; }
+    .m-wait-row .m-wait { border-top: 0; }
+    .actions .wa-sheet { margin-top: 10px; }
     @media (max-width: 879px) {
       .money-split { grid-template-columns: 1fr; }
     }

@@ -477,6 +477,35 @@ function hookDesk(){
     toast="Marked paid.";
     draw();
   });
+  document.querySelectorAll("[data-wapick]").forEach(b=>b.onclick=function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    waPick=b.getAttribute("data-wapick");
+    draw();
+  });
+  document.querySelectorAll("[data-waclose]").forEach(b=>b.onclick=function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    waPick=null;
+    draw();
+  });
+  document.querySelectorAll("[data-staffphone]").forEach(function(form){
+    form.onsubmit=function(e){
+      e.preventDefault();
+      const seller=form.getAttribute("data-staffphone");
+      const phone=String((new FormData(form)).get("phone")||"").trim();
+      if(phone&&digits(phone).length<9){toast="WhatsApp number.";draw();return}
+      let u=staffUser(seller);
+      if(!u){
+        u={name:SL[seller]||seller,seller:seller,x:seller,role:seller==="luan"?"admin":"sales",status:"approved",phone:phone};
+        if(seller==="luan"){u.email=LUAN.email;u.password=LUAN.password}
+        S.users.push(u);
+      }else u.phone=phone;
+      save();
+      toast=phone?"Staff WhatsApp saved.":"Staff WhatsApp cleared.";
+      draw();
+    };
+  });
   if(tab==="capture"&&toast==="On the board."){
     const n=document.querySelector("#cap [name=name]");
     if(n) setTimeout(function(){n.focus()},40);

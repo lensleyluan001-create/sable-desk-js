@@ -157,7 +157,12 @@ function viewMoney(rows){
     "</div>";
   const wait=m.outstanding.length
     ? m.outstanding.slice(0,8).map(function(o){
-        return '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+mismatchBadge(rows.find(function(x){return x.id===o.id})||{})+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>";
+        const lead=rows.find(function(x){return x.id===o.id})||{};
+        const chase=canChaseDraft(lead);
+        return '<div class="m-wait-row">'+
+          '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+mismatchBadge(lead)+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>"+
+          (chase?waPickerHtml(lead,{primary:false,kind:"pay",reason:"Unpaid EFT"}):"")+
+        "</div>";
       }).join("")
     : '<p class="meta">None waiting.</p>';
   const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
@@ -232,10 +237,16 @@ function viewMeetings(){
 }
 function viewTeam(){
   const pending=S.requests.filter(r=>r.status!=="approved"&&r.status!=="denied");
-  const rest=S.users.filter(u=>norm(u.email)!==LUAN.email);
   const b=bankOf();
   const bank=houseView()?'<h3 style="margin-top:24px">EFT on the invoice</h3><p class="sub">This is what the customer sees. Save it once.</p><form class="card" id="bank"><label>Bank</label><input name="bank" value="'+esc(b.bank)+'" placeholder="Bank name" autocomplete="off" /><label>Account name</label><input name="accountName" value="'+esc(b.accountName)+'" placeholder="Sable" autocomplete="off" /><label>Account number</label><input name="accountNumber" value="'+esc(b.accountNumber)+'" inputmode="numeric" autocomplete="off" /><label>Branch</label><input name="branch" value="'+esc(b.branch)+'" autocomplete="off" /><label>Account type</label><input name="type" value="'+esc(b.type||"Cheque")+'" autocomplete="off" /><button class="solid" type="submit">Save on invoices</button></form>':"";
-  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p><h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">People</h3>'+S.users.map(u=>'<div class="lead"><p class="name">'+esc(u.name)+'</p><p class="meta">'+esc(u.email)+' · '+esc(u.role)+' · '+(SL[u.seller]||"")+' · '+esc(u.status)+'</p></div>').join("")+bank;
+  const people=SELLERS.map(function(s){
+    const u=staffUser(s);
+    const raw=u?(u.phone||u.whatsapp||u.wa||""):"";
+    const name=(u&&u.name)||SL[s];
+    const email=(u&&u.email)||"";
+    return '<form class="card" data-staffphone="'+s+'"><p class="name">'+esc(name)+'</p><p class="meta">'+esc(email)+(email?" · ":"")+esc(SL[s])+'</p><label>WhatsApp</label><input name="phone" value="'+esc(raw)+'" inputmode="tel" placeholder="08 or 27 — type theirs, we do not invent one" autocomplete="off" /><button class="solid" type="submit">Save WhatsApp</button></form>';
+  }).join("");
+  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p><h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">Staff WhatsApp</h3><p class="sub">Floor drafts go here. Blank means no number — we will not invent one.</p>'+people+bank;
 }
 function viewPerson(){
   const l=S.leads.find(x=>x.id===personId);
@@ -246,10 +257,6 @@ function viewPerson(){
   const age=l.updatedAt||l.createdAt;
   const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
   const profit=seeCost()?Math.max(0,t.listed-pairCostOf(l)):null;
-  const waFirst=wa(l.phone,firstMsg(l));
-  const waSize=wa(l.phone,sizeMsg(l));
-  const waPay=wa(l.phone,payMsg(l));
-  const waFollow=wa(l.phone,followMsg(l));
   const pairImg=p?turnHtml(p,l.colour||"book",pairView||0,l.extras):"";
   const skuOpts=PAIRS.map(x=>'<option value="'+x.sku+'"'+(x.sku===l.sku?" selected":"")+">"+x.sku+" · "+esc(x.look)+" · "+zar(x.price)+"</option>").join("");
   const sizeChips=['<button class="chip '+(!l.size?"on":"")+'" type="button" data-psize="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(String(l.size)===s?"on":"")+'" type="button" data-psize="'+s+'">'+s+"</button>")).join("");
@@ -259,7 +266,7 @@ function viewPerson(){
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
-  const waRow='<div class="actions">'+(waFirst?'<a class="chip on" href="'+waFirst+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp first</a>':"")+(waSize?'<a class="chip" href="'+waSize+'" target="_blank" rel="noreferrer">Ask size</a>':"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button>'+(waPay?'<a class="chip" href="'+waPay+'" target="_blank" rel="noreferrer">WhatsApp EFT</a>':"")+(waFollow?'<a class="chip" href="'+waFollow+'" target="_blank" rel="noreferrer">Follow up</a>':"")+'<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const waRow='<div class="actions">'+(canChaseDraft(l)?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);

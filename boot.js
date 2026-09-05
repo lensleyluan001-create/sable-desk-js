@@ -50,6 +50,48 @@ function patchLead(id,fields){
   const next=Object.assign({},prev,fields,{updatedAt:Date.now(),sitAt});
   S.leads[i]=next;
   save();
+  try{
+    fetch(API,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(next)}).catch(function(){});
+  }catch(e){}
+}
+function applyProofToLead(id,file,who){
+  if(!id||!file) return;
+  compressProofFile(file,function(err,url){
+    if(err||!url){toast=(err&&err.message)||"Could not read that image.";draw();return}
+    const l=S.leads.find(x=>x.id===id);
+    if(!l){toast="Ticket not found.";draw();return}
+    if(l.status==="lost"){toast="Lost tickets stay off money.";draw();return}
+    patchLead(id,{
+      proofUrl:url,
+      proofAt:Date.now(),
+      proofBy:who||staffName(),
+      proofStatus:"in",
+      nextAction:"Proof attached — verify EFT",
+      nextActionAt:null,
+      sitAt:Date.now(),
+      paid:false
+    });
+    toast="Proof attached — verify EFT.";
+    draw();
+  });
+}
+function rejectProof(id){
+  const l=S.leads.find(x=>x.id===id);
+  if(!l) return;
+  const note=String(l.note||"");
+  const add="Proof rejected.";
+  patchLead(id,{
+    proofUrl:"",
+    proofAt:null,
+    proofBy:"",
+    proofStatus:"rejected",
+    nextAction:"Chase the EFT",
+    nextActionAt:null,
+    sitAt:Date.now(),
+    note:note?(note.indexOf(add)>=0?note:(note+"\n"+add)):add
+  });
+  toast="Proof rejected. Chase the EFT.";
+  draw();
 }
 function runIdleAutoAssign(){
   if(!S.session||!houseView()) return;
@@ -272,10 +314,11 @@ function hookDesk(){
     if(!personId) return;
     const on=b.getAttribute("data-paid")==="1";
     const l=S.leads.find(x=>x.id===personId);
+    const proof=l&&hasProof(l);
     patchLead(personId,{
       paid:on,
       status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
-      nextAction:on?"EFT received. Close the card.":"Chase the EFT",
+      nextAction:on?"EFT received. Close the card.":(proof?"Proof attached — verify EFT":"Chase the EFT"),
       nextActionAt:on?null:l&&l.nextActionAt
     });
     toast=on?"Marked paid.":"Paid undone.";
@@ -477,6 +520,70 @@ function hookDesk(){
     toast="Marked paid.";
     draw();
   });
+  document.querySelectorAll("[data-proof]").forEach(function(inp){
+    inp.onchange=function(){
+      const file=inp.files&&inp.files[0];
+      const id=inp.getAttribute("data-proof");
+      if(file) applyProofToLead(id,file);
+      inp.value="";
+    };
+  });
+  document.querySelectorAll("[data-copyproof]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-copyproof");
+    const l=S.leads.find(x=>x.id===id);
+    const href=proofLink(l);
+    if(!href) return;
+    const done=function(){toast="Proof link copied. They send the screenshot. You still Mark paid." ;draw()};
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(href).then(done).catch(function(){toast=href;draw()});
+    }else{toast=href;draw()}
+  });
+  document.querySelectorAll("[data-proofzoom]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-proofzoom");
+    const l=S.leads.find(x=>x.id===id);
+    const box=document.getElementById("proof-zoom");
+    if(!box||!l||!l.proofUrl) return;
+    const img=box.querySelector("img");
+    if(img) img.src=l.proofUrl;
+    box.hidden=false;
+  });
+  document.querySelectorAll("[data-proofzoomx]").forEach(b=>b.onclick=function(){
+    const box=document.getElementById("proof-zoom");
+    if(!box) return;
+    box.hidden=true;
+    const img=box.querySelector("img");
+    if(img) img.removeAttribute("src");
+  });
+  const zoom=document.getElementById("proof-zoom");
+  if(zoom) zoom.onclick=function(e){
+    if(e.target===zoom){
+      zoom.hidden=true;
+      const img=zoom.querySelector("img");
+      if(img) img.removeAttribute("src");
+    }
+  };
+  if(!window.__sableProofPaste){
+    window.__sableProofPaste=true;
+    document.addEventListener("paste",function(e){
+      if(!S.session) return;
+      const items=e.clipboardData&&e.clipboardData.items;
+      if(!items) return;
+      let file=null;
+      for(let i=0;i<items.length;i++){
+        if(items[i].type&&items[i].type.indexOf("image/")===0){
+          file=items[i].getAsFile&&items[i].getAsFile();
+          if(file) break;
+        }
+      }
+      if(!file) return;
+      let id=personId;
+      const drop=document.querySelector("[data-proof]");
+      if(!id&&drop) id=drop.getAttribute("data-proof");
+      if(!id) return;
+      e.preventDefault();
+      applyProofToLead(id,file);
+    });
+  }
   document.querySelectorAll("[data-wapick]").forEach(b=>b.onclick=function(e){
     e.preventDefault();
     e.stopPropagation();

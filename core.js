@@ -1,4 +1,5 @@
 const KEY="sable-crm-v4";
+const PROOF_KEY="sable-crm-v4-proofs";
 const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
 function esc(s){
@@ -177,6 +178,10 @@ function leadFix(l){
     nextAction:nextAction,
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
+    proofUrl:String(l.proofUrl||""),
+    proofAt:l.proofAt||null,
+    proofBy:String(l.proofBy||""),
+    proofStatus:String(l.proofStatus||""),
     createdAt:l.createdAt||Date.now(),
     updatedAt:l.updatedAt||l.createdAt||Date.now(),
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
@@ -196,6 +201,33 @@ function keepLeads(list){
     byId.set(l.id,nt>=pt?Object.assign({},prev,l):Object.assign({},l,prev));
   }
   return Array.from(byId.values());
+}
+function readProofMap(){
+  try{
+    const o=JSON.parse(localStorage.getItem(PROOF_KEY)||"{}");
+    return o&&typeof o==="object"?o:{};
+  }catch(e){return {}}
+}
+function stashProofs(list){
+  const map=readProofMap();
+  (list||[]).forEach(function(l){
+    if(!l||!l.id) return;
+    const url=String(l.proofUrl||"");
+    if(url.indexOf("data:")===0) map[l.id]=url;
+    else if(!url||url.indexOf("proof:")===0) return;
+    else if(String(l.proofStatus||"")==="rejected") delete map[l.id];
+  });
+  try{localStorage.setItem(PROOF_KEY,JSON.stringify(map))}catch(e){}
+}
+function hydrateProofs(list){
+  const map=readProofMap();
+  return (list||[]).map(function(l){
+    if(!l) return l;
+    const url=String(l.proofUrl||"");
+    if(url.indexOf("data:")===0) return l;
+    const sid=map[l.id]||(url.indexOf("proof:")===0?map[url.slice(6)]:"");
+    return sid?Object.assign({},l,{proofUrl:sid}):l;
+  });
 }
 function load(){
   let s;
@@ -217,6 +249,7 @@ function load(){
     if(Array.isArray(raw)) extra=raw;
   }catch(e){}
   s.leads=keepLeads(s.leads.concat(extra)).map(leadFix);
+  s.leads=hydrateProofs(s.leads);
   const i=s.users.findIndex(u=>norm(u.email)===LUAN.email);
   if(i<0)s.users.unshift(Object.assign({},LUAN));
   else{
@@ -249,9 +282,17 @@ function save(){
     const extra=JSON.parse(localStorage.getItem(KEY+"-leads")||"[]");
     if(Array.isArray(extra)) stored=stored.concat(extra);
   }catch(e){}
-  S.leads=keepLeads(stored.concat(S.leads)).map(leadFix);
-  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
-  try{localStorage.setItem(KEY+"-leads",JSON.stringify(S.leads))}catch(e){}
+  S.leads=hydrateProofs(keepLeads(stored.concat(S.leads)).map(leadFix));
+  stashProofs(S.leads);
+  const slim=S.leads.map(function(l){
+    if(!l||!l.proofUrl||String(l.proofUrl).indexOf("data:")!==0) return l;
+    return Object.assign({},l,{proofUrl:l.id?"proof:"+l.id:""});
+  });
+  const pack=Object.assign({},S,{leads:slim});
+  try{localStorage.setItem(KEY,JSON.stringify(pack))}catch(e){
+    try{localStorage.setItem(KEY,JSON.stringify(Object.assign({},pack,{leads:slim.map(function(l){return Object.assign({},l,{proofUrl:""})})})))}catch(err){}
+  }
+  try{localStorage.setItem(KEY+"-leads",JSON.stringify(slim))}catch(e){}
   vaultPush();
 }
 let S=load();
@@ -516,9 +557,10 @@ function tallyMoney(rows){
           name:l.name,
           sku:l.sku,
           due:t.due,
-          age:now-(l.updatedAt||l.createdAt||now),
+          age:hasProof(l)?proofAgeMs(l):(now-(l.updatedAt||l.createdAt||now)),
           owner:owner,
-          mismatch:!!t.mismatch
+          mismatch:!!t.mismatch,
+          proof:hasProof(l)
         });
       }
     }else{
@@ -641,6 +683,13 @@ function followMsg(l){
 function clientWebUrl(){
   return "https://sable-floor.vercel.app/want";
 }
+function proofLink(l){
+  if(!l) return "";
+  const base=clientWebUrl();
+  if(l.id) return base+"?proof="+encodeURIComponent(l.id);
+  if(l.invRef) return base+"?ref="+encodeURIComponent(l.invRef);
+  return "";
+}
 function Gate(){
   let form="";
   if(mode==="reset") form='<form class="card" id="reset"><label>Email</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. House key still works after you set one.</p>';
@@ -704,12 +753,41 @@ function todoAge(it){
 function nextActionClose(l){
   return !!(l&&l.paid&&/eft received|close the card/i.test(String(l.nextAction||"")));
 }
+function hasProof(l){
+  if(!l) return false;
+  if(String(l.proofStatus||"")==="rejected") return false;
+  const url=String(l.proofUrl||"").trim();
+  return !!url;
+}
+function payState(l){
+  if(!l) return "unpaid";
+  if(l.paid) return "paid";
+  if(hasProof(l)) return "proof_received";
+  if(String(l.invRef||"").trim()) return "invoice_sent";
+  return "unpaid";
+}
+function payStateLabel(st){
+  if(st==="paid") return "Paid";
+  if(st==="proof_received") return "Proof in — verify";
+  if(st==="invoice_sent") return "Invoice out";
+  return "Unpaid";
+}
+function proofAgeMs(l){
+  if(!l) return 0;
+  const t=Number(l.proofAt||l.sitAt||l.updatedAt||l.createdAt)||Date.now();
+  return Math.max(0,Date.now()-t);
+}
+function staffName(){
+  const s=(typeof mySeller==="function"&&mySeller())||"";
+  return (typeof SL!=="undefined"&&SL[s])||s||"Staff";
+}
 function isWaitingOnMoney(l){
   if(!l||l.paid||l.status==="lost") return false;
+  if(hasProof(l)) return true;
   if(l.status==="closed") return true;
   if(String(l.invRef||"").trim()) return true;
   const t=nextTodo(l);
-  if(t&&t.kind==="pay") return true;
+  if(t&&(t.kind==="pay"||t.kind==="verify")) return true;
   return /invoice|eft|pay/i.test(String(l.nextAction||""));
 }
 function nextStepLabel(l){
@@ -723,6 +801,7 @@ function nextTodo(l){
   if(!l||l.status==="lost") return null;
   if(l.status==="closed"&&l.paid) return null;
   if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
+  if(hasProof(l)&&!l.paid) return {kind:"verify",step:"Verify EFT",cta:"Mark paid",done:true,wa:false,lane:"now"};
   const now=Date.now();
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
   const waiting=due>now;
@@ -746,7 +825,7 @@ function nextTodo(l){
 function isPayConfirm(t,l){
   if(!l||l.paid||l.status==="lost") return false;
   if(t&&t.kind==="close") return false;
-  if(t&&t.kind==="pay") return true;
+  if(t&&(t.kind==="pay"||t.kind==="verify")) return true;
   const na=String((t&&t.step)||l.nextAction||"");
   return /invoice|eft|pay/i.test(na);
 }
@@ -785,7 +864,7 @@ function slaStaffText(it){
 }
 function kindRank(t){
   if(!t) return 9;
-  return t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:t.kind==="pay"?3:t.kind==="size"?4:t.kind==="follow"?6:t.lane==="wait"?80:9;
+  return t.kind==="close"?0:t.kind==="verify"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:t.kind==="pay"?3:t.kind==="size"?4:t.kind==="follow"?6:t.lane==="wait"?80:9;
 }
 function todoRank(t,sla){
   const k=kindRank(t);
@@ -811,7 +890,7 @@ function canChaseDraft(l){
 function wantsCustomerDraft(l){
   if(!canChaseDraft(l)) return false;
   const t=nextTodo(l);
-  if(!t||t.kind==="close"||t.kind==="take") return false;
+  if(!t||t.kind==="close"||t.kind==="take"||t.kind==="verify") return false;
   return !!(t.wa||t.kind==="pay"||t.kind==="whatsapp"||t.kind==="size"||t.kind==="follow");
 }
 function customerDraftText(l,kind){
@@ -829,6 +908,7 @@ function customerDraftText(l,kind){
 function draftReason(l){
   const t=nextTodo(l);
   const sla=slaOf(t,l);
+  if(t&&t.kind==="verify") return "Verify EFT";
   if(sla.paySla||(t&&t.kind==="pay")) return "Unpaid EFT";
   if(sla.needsLuan) return "Needs Luan";
   if(sla.escalateStaff) return "SLA sitting over 2 hours";
@@ -918,6 +998,7 @@ function todoVerb(it){
   if(it.kind==="take") return "Take this lead";
   if(it.kind==="whatsapp") return "Send the first WhatsApp";
   if(it.kind==="size") return /chase/i.test(it.step)?"Chase the size":"Ask for UK size";
+  if(it.kind==="verify") return "Verify EFT";
   if(it.kind==="pay") return /chase/i.test(it.step)?"Chase the EFT":"Send the invoice";
   if(it.kind==="follow") return "Follow up";
   if(it.kind==="wait") return it.step||"Waiting on them";
@@ -927,6 +1008,7 @@ function todoStage(it){
   if(!it||!it.lead||it.kind==="take") return -1;
   const l=it.lead;
   if(it.kind==="close"||(l.paid&&l.status!=="closed")) return 3;
+  if(it.kind==="verify") return 2;
   if(it.kind==="pay"||!needsSize(l)) return 2;
   if(it.kind==="size"||l.status==="contacted"||l.status==="working") return 1;
   return 0;
@@ -1018,12 +1100,17 @@ function todoCta(it){
   let out="";
   if(it.kind==="close") out='<button class="solid tight" type="button" data-done="'+esc(it.id)+'">Mark closed</button>';
   else if(it.kind==="take") out='<button class="solid tight" type="button" data-take="'+l.id+'">Take onto my book</button>';
-  else if(it.kind==="size"){
+  else if(it.kind==="verify"){
+    out=proofThumbHtml(l)+
+      '<button class="solid tight" type="button" data-todopaid="'+l.id+'">Mark paid</button>'+
+      '<button class="ghost" type="button" data-rejectproof="'+l.id+'">Reject proof</button>';
+  }else if(it.kind==="size"){
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
     out=draft+sizes+todoPendBtn(l,it);
   }else if(it.kind==="pay"){
     out='<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
       draft+
+      proofDropHtml(l)+
       '<button class="ghost" type="button" data-todopaid="'+l.id+'">Confirm paid</button>'+todoPendBtn(l,it);
   }else{
     out=(draft||'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>')+todoPendBtn(l,it);
@@ -1031,7 +1118,7 @@ function todoCta(it){
   return out;
 }
 function todoPendBtn(l,it){
-  if(!l||!it||it.kind==="close"||it.kind==="take"||it.lane==="wait") return "";
+  if(!l||!it||it.kind==="close"||it.kind==="take"||it.kind==="verify"||it.lane==="wait") return "";
   return '<button class="ghost" type="button" data-pend="'+l.id+'">Pend</button>';
 }
 function todoHero(it,nNow){
@@ -1268,9 +1355,13 @@ function standupUnpaid(){
   standupRows().forEach(function(l){
     if(!isWaitingOnMoney(l)) return;
     const t=nextTodo(l);
-    const wait=sitMs(l);
-    const why=wait>3600000?"Unpaid EFT over 1 hour":(todoVerb(t)||"Waiting on money");
-    out.push(standupPack(l,why));
+    const proof=hasProof(l);
+    const wait=proof?proofAgeMs(l):sitMs(l);
+    const why=proof?"Proof in — verify":(wait>3600000?"Unpaid EFT over 1 hour":(todoVerb(t)||"Waiting on money"));
+    const pack=standupPack(l,why);
+    pack.wait=wait;
+    pack.heat=sitHeat(wait);
+    out.push(pack);
   });
   out.sort(standupSort);
   return out;
@@ -1331,12 +1422,87 @@ function buildStandup(){
 function standupCta(kind,row){
   const l=row&&row.lead;
   if(!l) return "";
-  const draft=canChaseDraft(l)?waPickerHtml(l,{
+  const proof=hasProof(l);
+  const draft=canChaseDraft(l)&&!proof?waPickerHtml(l,{
     primary:kind!=="unpaid",
     kind:kind==="unpaid"?"pay":(row.todo&&row.todo.kind),
     reason:row.why||draftReason(l)
   }):"";
-  if(kind==="unpaid") return draft+'<button class="solid tight" type="button" data-todopaid="'+l.id+'">Confirm paid</button>';
+  if(kind==="unpaid"){
+    return (proof?proofThumbHtml(l):proofDropHtml(l))+
+      draft+
+      '<button class="solid tight" type="button" data-todopaid="'+l.id+'">'+(proof?"Mark paid":"Confirm paid")+"</button>"+
+      (proof?'<button class="ghost" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"");
+  }
   return draft+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
+}
+
+function proofThumbHtml(l){
+  if(!l||!String(l.proofUrl||"").trim()) return "";
+  const url=String(l.proofUrl||"");
+  if(url.indexOf("proof:")===0&&url.indexOf("data:")!==0) return "";
+  const by=l.proofBy?(" · "+l.proofBy):"";
+  const when=l.proofAt?(" · "+sitLabel(proofAgeMs(l))):"";
+  const lab=l.paid?"EFT proof":"EFT proof";
+  return '<div class="proof-shot">'+
+    '<button class="proof-thumb" type="button" data-proofzoom="'+esc(l.id)+'" title="Open proof">'+
+      '<img src="'+url.split('"').join("")+'" alt="EFT proof">'+
+    "</button>"+
+    '<p class="meta">'+esc(lab+by+when)+"</p>"+
+  "</div>";
+}
+function proofDropHtml(l){
+  if(!l||l.paid||hasProof(l)) return "";
+  return '<label class="proof-drop">Add EFT proof'+
+    '<input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" data-proof="'+l.id+'">'+
+  "</label>";
+}
+function proofCardHtml(l){
+  if(!l) return "";
+  const live=hasProof(l)||(l.paid&&String(l.proofUrl||"").trim());
+  const body=live?proofThumbHtml(l):proofDropHtml(l);
+  const ctas=(!l.paid&&hasProof(l))
+    ? '<div class="row proof-ctas"><button class="solid tight" type="button" data-paid="1">Mark paid</button><button class="ghost" type="button" data-rejectproof="'+l.id+'">Reject proof</button></div>'
+    : "";
+  const hint=(!l.paid&&!hasProof(l))?'<p class="meta">Drop a jpg, png or webp, or paste. Paid stays No until you verify.</p>':"";
+  const share=(!l.paid&&l.id)?'<button class="chip" type="button" data-copyproof="'+l.id+'">Copy proof link</button>':"";
+  return '<div class="proof-card">'+body+hint+'<div class="row">'+share+"</div>"+ctas+"</div>";
+}
+function proofZoomHtml(){
+  return '<div id="proof-zoom" class="proof-zoom" hidden><button class="proof-zoom-close" type="button" data-proofzoomx="1">Close</button><img alt="EFT proof"></div>';
+}
+function compressProofFile(file,cb){
+  if(!file){cb(new Error("Need an image."));return}
+  const type=String(file.type||"");
+  const name=String(file.name||"");
+  const ok=/^image\/(jpeg|jpg|png|webp)$/i.test(type)||/\.(jpe?g|png|webp)$/i.test(name);
+  if(!ok){cb(new Error("Use a jpg, png or webp."));return}
+  const img=new Image();
+  const href=URL.createObjectURL(file);
+  img.onload=function(){
+    let w=img.naturalWidth||img.width||1;
+    let h=img.naturalHeight||img.height||1;
+    const max=1280;
+    const scale=Math.min(1,max/Math.max(w,h));
+    w=Math.max(1,Math.round(w*scale));
+    h=Math.max(1,Math.round(h*scale));
+    const canvas=document.createElement("canvas");
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext("2d");
+    ctx.drawImage(img,0,0,w,h);
+    let q=0.72;
+    let data=canvas.toDataURL("image/jpeg",q);
+    while(data.length>480000&&q>0.42){
+      q-=0.08;
+      data=canvas.toDataURL("image/jpeg",q);
+    }
+    URL.revokeObjectURL(href);
+    cb(null,data);
+  };
+  img.onerror=function(){
+    URL.revokeObjectURL(href);
+    cb(new Error("Could not read that image."));
+  };
+  img.src=href;
 }
 

@@ -88,6 +88,113 @@
     }
     let bag = loadBag();
     let thanks = "";
+    let lastWantLead = null;
+    let proofNote = "";
+    function compressWantProof(file){
+      return new Promise(function(resolve, reject){
+        if (!file){ reject(new Error("Need an image.")); return; }
+        const type = String(file.type || "");
+        const name = String(file.name || "");
+        const ok = /^image\/(jpeg|jpg|png|webp)$/i.test(type) || /\.(jpe?g|png|webp)$/i.test(name);
+        if (!ok){ reject(new Error("Use a jpg, png or webp.")); return; }
+        const img = new Image();
+        const href = URL.createObjectURL(file);
+        img.onload = function(){
+          let w = img.naturalWidth || img.width || 1;
+          let h = img.naturalHeight || img.height || 1;
+          const max = 1280;
+          const scale = Math.min(1, max / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          let q = 0.72;
+          let data = canvas.toDataURL("image/jpeg", q);
+          while (data.length > 480000 && q > 0.42){
+            q -= 0.08;
+            data = canvas.toDataURL("image/jpeg", q);
+          }
+          URL.revokeObjectURL(href);
+          resolve(data);
+        };
+        img.onerror = function(){
+          URL.revokeObjectURL(href);
+          reject(new Error("Could not read that image."));
+        };
+        img.src = href;
+      });
+    }
+    function proofFormHtml(lead){
+      if (!lead || lead.paid) return "";
+      const has = !!(lead.proofUrl && lead.proofStatus !== "rejected");
+      if (has) return '<div class="proof-box"><p class="ok">Proof sent. Sable will confirm. This is not paid yet.</p></div>';
+      return '<div class="proof-box" id="proof-box">'+
+        '<p class="kicker">Send proof of payment</p>'+
+        '<p class="hint">Screenshot of the EFT. Staff mark it paid — sending this does not confirm the pair.</p>'+
+        '<label class="proof-drop">Choose screenshot'+
+          '<input type="file" id="want-proof" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">'+
+        "</label>"+
+        (proofNote ? '<p id="proof-msg" class="hint">'+proofNote+"</p>" : '<p id="proof-msg" class="hint"></p>')+
+      "</div>";
+    }
+    async function sendWantProof(file, lead){
+      const msgEl = document.getElementById("proof-msg");
+      if (!lead || !lead.id){
+        if (msgEl) msgEl.textContent = "Ask Sable for a ticket link.";
+        return;
+      }
+      if (msgEl) msgEl.textContent = "Sending…";
+      try {
+        const url = await compressWantProof(file);
+        const now = Date.now();
+        const body = {
+          id: lead.id,
+          proofUrl: url,
+          proofAt: now,
+          proofBy: "client",
+          proofStatus: "in",
+          nextAction: "Proof attached — verify EFT",
+          nextActionAt: null,
+          sitAt: now,
+          paid: false,
+          updatedAt: now
+        };
+        const r = await fetch("/api/lead", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (!r.ok){
+          if (msgEl) msgEl.textContent = "Could not attach. Ask Sable for a ticket link.";
+          return;
+        }
+        lastWantLead = Object.assign({}, lead, body);
+        proofNote = "Proof sent. Sable will confirm. This is not paid yet.";
+        draw(false);
+      } catch (err) {
+        if (msgEl) msgEl.textContent = (err && err.message) || "Could not read that image.";
+      }
+    }
+    async function loadProofTicket(){
+      const q = new URLSearchParams(location.search);
+      const id = String(q.get("proof") || "").trim();
+      const ref = String(q.get("ref") || "").trim();
+      if (!id && !ref) return;
+      try {
+        const r = await fetch("/api/lead?" + (id ? ("id="+encodeURIComponent(id)) : ("ref="+encodeURIComponent(ref))));
+        const j = await r.json();
+        const lead = (j.leads || [])[0];
+        if (lead){
+          lastWantLead = lead;
+          thanks = "Send proof of payment for this ticket.";
+          screen = "order";
+          bag = [];
+          saveBag();
+          draw(false);
+        }
+      } catch (err) {}
+    }
     function addLine(it){
       const key = lineKey(it);
       const hit = bag.find(x => lineKey(x)===key);
@@ -308,7 +415,13 @@
         if (wantForm) wantForm.hidden = true;
         const title = document.getElementById("order-title");
         if (title) title.textContent = "Sent";
-        bagEl.innerHTML = '<p class="ok thanks">'+thanks+"</p>";
+        bagEl.innerHTML = '<p class="ok thanks">'+thanks+"</p>"+proofFormHtml(lastWantLead);
+        const proofInp = document.getElementById("want-proof");
+        if (proofInp) proofInp.onchange = function(){
+          const file = proofInp.files && proofInp.files[0];
+          if (file) sendWantProof(file, lastWantLead);
+          proofInp.value = "";
+        };
         if (dueEl) dueEl.textContent = "";
         return;
       }
@@ -425,6 +538,10 @@
           body: JSON.stringify(lead)
         });
         ok = r.ok;
+        if (ok){
+          const j = await r.json().catch(function(){ return null; });
+          if (j && j.lead) lastWantLead = j.lead;
+        }
       } catch (err) {}
       try {
         const lines = (lead.items||[]).map(it => it.sku+" "+it.look+(it.size?" UK "+it.size:"")+" ×"+it.qty).join(" · ");
@@ -474,3 +591,4 @@
       window.scrollTo(0, 0);
     });
     draw(false);
+    loadProofTicket();

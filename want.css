@@ -247,6 +247,22 @@
       letter-spacing: -.02em;
     }
     .thanks { padding: 18px 0; font-size: 16px; }
+    .proof-box {
+      margin-top: 18px; padding: 16px;
+      background: var(--card); border-radius: 16px;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+    .proof-box .kicker {
+      font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600; margin: 0 0 6px;
+    }
+    .proof-drop {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 44px; padding: 10px 16px; margin-top: 10px;
+      border-radius: 999px; border: 1px dashed color-mix(in srgb, #1c1814 22%, transparent);
+      background: var(--elev); cursor: pointer; font-size: 13px; font-weight: 500;
+    }
+    .proof-drop input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
     .bag-dock {
       position: fixed; left: 16px; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom));
       z-index: 40; display: flex; justify-content: space-between; align-items: center;

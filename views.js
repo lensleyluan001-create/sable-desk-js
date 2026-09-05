@@ -160,16 +160,20 @@ function viewMoney(rows){
         const lead=rows.find(function(x){return x.id===o.id})||{};
         const book=o.owner&&o.owner!=="floor"?o.owner:bookOf(lead);
         const who=book&&book!=="floor"?('<span class="owner-chip">'+esc(SL[book]||book)+"</span>"):'<span class="owner-chip">Floor</span>';
-        const chase=canChaseDraft(lead);
+        const proof=!!o.proof||hasProof(lead);
+        const age=proof?proofAgeMs(lead):(o.age||0);
+        const chase=canChaseDraft(lead)&&!proof;
         return '<div class="m-wait-row">'+
           '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'">'+
             '<span>'+esc(o.name||"No name")+" · "+esc(o.sku||"")+mismatchBadge(lead)+" "+who+"</span>"+
-            '<span>'+zar(o.due)+" · "+sitLabel(o.age)+"</span>"+
+            '<span>'+zar(o.due)+" · "+esc(proof?"Proof in — verify":"Invoice out")+" · "+sitLabel(age)+"</span>"+
           "</button>"+
+          (proof?proofThumbHtml(lead):proofDropHtml(lead))+
           '<div class="row">'+
             '<button class="chip" type="button" data-go="person" data-id="'+o.id+'">Open</button>'+
             (chase?waPickerHtml(lead,{primary:false,kind:"pay",reason:"Unpaid EFT"}):"")+
-            '<button class="solid tight" type="button" data-todopaid="'+o.id+'">Confirm paid</button>'+
+            '<button class="solid tight" type="button" data-todopaid="'+o.id+'">'+(proof?"Mark paid":"Confirm paid")+"</button>"+
+            (proof?'<button class="ghost" type="button" data-rejectproof="'+o.id+'">Reject proof</button>':"")+
           "</div>"+
         "</div>";
       }).join("")
@@ -274,8 +278,13 @@ function viewPerson(){
   const delChips=[["collect","Collect"],["local","Local R100"],["int","International R300"]].map(([id,lab])=>'<button class="chip '+(l.delivery===id?"on":"")+'" type="button" data-pdel="'+id+'">'+lab+"</button>").join("");
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
-  const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div></div>';
-  const waRow='<div class="actions">'+(canChaseDraft(l)?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+(l.paid?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div><div class="line"><span>EFT</span><span>'+esc(payStateLabel(payState(l)))+"</span></div>"+proofCardHtml(l)+"</div>";
+  const proofOn=hasProof(l);
+  const paidBtn=l.paid
+    ?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>'
+    :'<button class="'+(proofOn?"chip on":"chip")+'" type="button" data-paid="1">Mark paid</button>';
+  const rejectBtn=(!l.paid&&proofOn)?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"";
+  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);
@@ -315,8 +324,11 @@ function viewInvoice(){
     (waPay?'<a class="chip on" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'">WhatsApp</a>':'')+
     '<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+
     (l.paid?'<span class="chip good on">Paid</span>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+
+    (!l.paid?proofDropHtml(l):"")+
+    (hasProof(l)&&!l.paid?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"")+
   "</div>";
   return '<div class="inv-wrap">'+bar+
+    (hasProof(l)||(l.paid&&l.proofUrl)?'<div class="no-print inv-proof">'+proofThumbHtml(l)+"</div>":"")+
     '<article class="inv-paper'+(l.paid?" is-paid":"")+'">'+
       (l.paid?'<p class="inv-stamp" aria-hidden="true">Paid</p>':"")+
       '<header class="inv-top">'+
@@ -341,5 +353,5 @@ function viewInvoice(){
 function Desk(){
   const body=personId?(invView?viewInvoice():viewPerson()):tab==="board"?viewBoard():tab==="capture"?viewCapture():tab==="clients"?viewClients():tab==="meetings"?viewMeetings():tab==="team"?viewTeam():tab==="todo"?viewTodo():viewStandup();
   const flash=deskFlash();
-  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["desk","Desk"],["todo","To-do"],["board","Board"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>";
+  return '<div class="shell"><aside class="side"><div class="side-head"><div class="side-brand"><span class="side-s">S</span></div></div><nav class="side-nav" aria-label="Sable">'+navBtns()+'</nav><button type="button" class="side-out" id="out"><span class="nav-mark">×</span><span class="nav-name">Sign out</span></button></aside><div class="stage"><header class="top"><div class="brand">SABLE FLOOR</div><div class="row"><a class="ghost" href="/want" target="_blank" rel="noreferrer">Client web</a><button class="ghost" type="button" id="copy-want">Copy link</button><button class="ghost" type="button" id="out2">Sign out</button></div></header><main class="work">'+flash+body+"</main><nav class='tabs' aria-label='Sable'>"+[["desk","Desk"],["todo","To-do"],["board","Board"],["capture","Capture"],["clients","Clients"],["meetings","Meetings"]].map(([id,lab])=>'<button type="button" class="'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))||(id==="clients"&&personId)?"on":"")+'" data-tab="'+id+'"'+(tab===id||(id==="meetings"&&(tab==="meetings"||tab==="team"))?' aria-current="page"':"")+'>'+lab+"</button>").join("")+"</nav></div></div>"+proofZoomHtml();
 }

@@ -40,6 +40,19 @@ function itemsOf(l){
   if(Array.isArray(l.items)&&l.items.length) return l.items.map(itemFix);
   return [itemFix(l)];
 }
+function needsSize(l){
+  const items=itemsOf(l);
+  if(items.length) return items.some(function(it){return !String(it.size||"")});
+  return !String(l&&l.size||"");
+}
+function sizeOf(l){
+  const items=itemsOf(l);
+  if(!items.length) return String(l&&l.size||"");
+  const sizes=items.map(function(it){return String(it.size||"")});
+  if(sizes.some(function(s){return !s})) return "";
+  const a=sizes[0];
+  return sizes.every(function(s){return s===a})?a:"";
+}
 function randZar(n){return Math.round(Number(n)||0)}
 function bookListed(l){
   return itemsOf(l).reduce(function(n,it){
@@ -133,20 +146,26 @@ function leadFix(l){
   const extras=extraPick(l.extras,first.extras);
   if(items.length) items=items.map(function(it,i){return i===0?Object.assign({},it,{extras:extras}):it});
   const p=shoe(l.sku||first.sku);
-  const miss=items.some(it=>!it.size);
+  const status=l.status||(l.stage==="inbox"?"new":l.stage)||"new";
+  const src=String(l.source||"").toLowerCase();
+  const web=src==="web"||src==="website"||src.indexOf("want")>=0||src.indexOf("lookbook")>=0;
+  let nextAction=String(l.nextAction||l.next||"").trim();
+  if(!nextAction&&status==="new"&&web) nextAction="Send the first WhatsApp";
+  const own=norm(l.owner);
+  const owner=(own&&SELLERS.indexOf(own)>=0)?own:(matchSeller(l.salesman)||null);
   return {
     id:l.id||uid(),
     name:String(l.name||"").trim(),
     phone:String(l.phone||"").trim(),
     sku:String(first.sku||l.sku||""),
     look:String(first.look||l.look||(p&&p.look)||""),
-    size:miss?"":String(first.size||l.size||""),
+    size:sizeOf({items:items,size:l.size}),
     qty:locked.qty,
     items,
-    source:l.source||"whatsapp",
-    status:l.status||(l.stage==="inbox"?"new":l.stage)||"new",
+    source:web?"website":(l.source||"whatsapp"),
+    status:status,
     note:String(l.note||""),
-    owner:l.owner||matchSeller(l.salesman)||null,
+    owner:owner,
     salesman:String(l.salesman||"").trim(),
     paid:Boolean(l.paid),
     paidAmount:Number(l.paidAmount||0)||0,
@@ -155,7 +174,7 @@ function leadFix(l){
     colour:first.colour||l.colour||"book",
     extras,
     listedPrice:locked.listedPrice,
-    nextAction:l.nextAction||l.next||"",
+    nextAction:nextAction,
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),
     createdAt:l.createdAt||Date.now(),
@@ -368,6 +387,42 @@ function priceMismatch(l){
 function isWebApp(l){
   const s=String(l&&l.source||"").toLowerCase();
   return s==="web"||s==="website"||s.indexOf("want")>=0||s.indexOf("lookbook")>=0;
+}
+function wantBurstKey(l){
+  if(!l) return "";
+  const phone=digits(l.phone);
+  const sku=String(l.sku||"");
+  const n=(Array.isArray(l.items)&&l.items.length)||0;
+  const t=Math.floor(Number(l.createdAt||0)/60000);
+  return phone+"|"+sku+"|"+n+"|"+t;
+}
+function isWantBurstDup(row,rows){
+  if(!row||!isWebApp(row)) return false;
+  const key=wantBurstKey(row);
+  if(!key||key.indexOf("||")===0) return false;
+  return (rows||[]).some(function(l){
+    if(!l||l.id===row.id) return false;
+    return isWebApp(l)&&wantBurstKey(l)===key;
+  });
+}
+function mergeWantIngest(incoming,rows){
+  incoming=incoming||[];
+  rows=Array.isArray(rows)?rows.slice():[];
+  const fresh=[];
+  for(let i=0;i<incoming.length;i++){
+    const row=leadFix(incoming[i]);
+    const byId=rows.find(function(l){return l.id===row.id});
+    if(byId){
+      const pt=Number(byId.updatedAt||byId.createdAt||0);
+      const nt=Number(row.updatedAt||row.createdAt||0);
+      if(nt>pt) Object.assign(byId,row,{id:byId.id});
+      continue;
+    }
+    if(isWantBurstDup(row,rows)) continue;
+    rows.unshift(row);
+    if(isWebApp(row)&&(row.status==="new"||row.status==="inbox")) fresh.push(row);
+  }
+  return {rows:keepLeads(rows).map(leadFix),fresh:fresh};
 }
 function pairCostOf(l){
   return itemsOf(l).reduce(function(n,it){
@@ -650,12 +705,12 @@ function nextTodo(l){
   const waiting=due>now;
   if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
   if(waiting){
-    const why=l.nextAction||(!l.size?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
+    const why=l.nextAction||(needsSize(l)?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
   }
   if(l.status==="closed"&&!l.paid) return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
   if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
-  if(!l.size){
+  if(needsSize(l)){
     const asked=/asked|uk size/i.test(String(l.nextAction||""));
     return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   }
@@ -747,7 +802,7 @@ function customerDraftText(l,kind){
   if(k==="pay") return invMsg(l);
   if(k==="size") return sizeMsg(l);
   if(l.status==="new"||l.status==="inbox") return firstMsg(l);
-  if(!l.size) return sizeMsg(l);
+  if(needsSize(l)) return sizeMsg(l);
   if(!l.paid) return invMsg(l);
   return followMsg(l);
 }
@@ -852,7 +907,7 @@ function todoStage(it){
   if(!it||!it.lead||it.kind==="take") return -1;
   const l=it.lead;
   if(it.kind==="close"||(l.paid&&l.status!=="closed")) return 3;
-  if(it.kind==="pay"||l.size) return 2;
+  if(it.kind==="pay"||!needsSize(l)) return 2;
   if(it.kind==="size"||l.status==="contacted"||l.status==="working") return 1;
   return 0;
 }

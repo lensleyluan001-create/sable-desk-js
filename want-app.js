@@ -1,7 +1,7 @@
     const HOUSE_MAIL = "lensleyluan001@gmail.com";
     const BAG_KEY = "sable-want-bag-v1";
     function zar(n){ if(n==null||n==="") return "POA"; return "R"+Number(n).toLocaleString("en-ZA"); }
-    function feeOf(d){ return d==="local"?150:d==="int"?0:0; }
+    function feeOf(d){ return d==="local"?100:d==="int"?300:0; }
     function digits(p){ return String(p||"").replace(/\D/g,""); }
     function uidLine(){ return "ln-"+Math.random().toString(36).slice(2,8); }
     const params = new URLSearchParams(location.search);
@@ -289,7 +289,7 @@
       });
     }
     function drawDels(){
-      const opts = [["collect","Collect"],["local","Delivery R150"],["int","Too far · quoted"]];
+      const opts = [["collect","Collect"],["local","Local R100"],["int","International R300"]];
       dels.innerHTML = opts.map(([id,lab]) =>
         '<button class="chip '+(delivery===id?"on":"")+'" type="button" data-del="'+id+'">'+lab+"</button>"
       ).join("");
@@ -406,38 +406,15 @@
       if (name.length < 2) { msg.className = "err"; msg.textContent = "Need a name."; return; }
       if (digits(phone).length < 9) { msg.className = "err"; msg.textContent = "WhatsApp number."; return; }
       const salesman = String(f.salesman || "").trim();
-      const items = bag.map(function(it){
-        return {
-          sku: it.sku,
-          look: it.look,
-          size: it.size,
-          qty: it.qty,
-          colour: it.colour,
-          extras: extraFix(it.extras),
-          listedPrice: it.price
-        };
-      });
-      const first = items[0];
-      const lead = {
-        name, phone,
-        sku: first.sku,
-        look: first.look,
-        size: items.every(it=>it.size===first.size) ? first.size : "",
-        price: first.listedPrice,
-        qty: bagCount(),
-        items,
-        delivery,
-        deliveryFee: feeOf(delivery),
-        colour: first.colour,
-        extras: extraFix(first.extras),
-        extrasFee: items.reduce((n,it)=>n+extraSum(it.extras, it.qty),0),
+      const lead = wantDeskLead({
+        name: name,
+        phone: phone,
+        salesman: salesman,
         note: String(f.note||"").trim(),
-        salesman,
-        owner: matchSeller(salesman),
-        source: "website",
-        heat: "hot",
+        delivery: delivery,
+        bag: bag,
         createdAt: Date.now()
-      };
+      });
       msg.className = "";
       msg.textContent = "Sending…";
       let ok = false;
@@ -450,7 +427,7 @@
         ok = r.ok;
       } catch (err) {}
       try {
-        const lines = items.map(it => it.sku+" "+it.look+(it.size?" UK "+it.size:"")+" ×"+it.qty).join(" · ");
+        const lines = (lead.items||[]).map(it => it.sku+" "+it.look+(it.size?" UK "+it.size:"")+" ×"+it.qty).join(" · ");
         await fetch("https://formsubmit.co/ajax/" + HOUSE_MAIL, {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -459,9 +436,9 @@
             name: lead.name,
             phone: lead.phone,
             pairs: lines,
-            sku: items.map(it=>it.sku).join(", "),
-            hide: items.map(it=>hideName(it.colour)).join(", "),
-            extras: items.map(it=>extraLabel(it.extras)||"None").join(" · "),
+            sku: (lead.items||[]).map(it=>it.sku).join(", "),
+            hide: (lead.items||[]).map(it=>hideName(it.colour)).join(", "),
+            extras: (lead.items||[]).map(it=>extraLabel(it.extras)||"None").join(" · "),
             salesman: salesman || "",
             delivery: lead.delivery,
             listed: zar(bagDue()),

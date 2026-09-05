@@ -60,6 +60,67 @@ function matchSeller(name){
   if(q==="dylan"||q.indexOf("dylan")===0) return "dylan";
   return null;
 }
+function wantDeskLead(opts){
+  opts=opts||{};
+  const now=Number(opts.createdAt)||Date.now();
+  const name=String(opts.name||"").trim();
+  const phone=String(opts.phone||"").trim();
+  const salesman=String(opts.salesman||"").trim();
+  const owner=matchSeller(salesman)||null;
+  const delivery=opts.delivery||"collect";
+  const fee=delivery==="local"?100:delivery==="int"?300:0;
+  const bag=Array.isArray(opts.bag)?opts.bag:[];
+  const items=bag.map(function(it){
+    const p=shoe(it.sku);
+    const qty=Math.max(1, Number(it.qty||1)||1);
+    const extras=extraFix(it.extras);
+    const book=(p&&p.price)||0;
+    const unit=Number(it.listedPrice!=null?it.listedPrice:it.price)||0;
+    const custom=unit>0&&Math.round(unit)!==Math.round(book);
+    return {
+      sku:String((p&&p.sku)||it.sku||""),
+      look:String(it.look||(p&&p.look)||""),
+      size:String(it.size||""),
+      qty:qty,
+      colour:it.colour||"book",
+      extras:extras,
+      listedPrice:custom?unit:null,
+      listed:custom?unit:book
+    };
+  }).filter(function(it){return it.sku});
+  const first=items[0]||{};
+  const pairsListed=items.reduce(function(n,it){return n+Number(it.listed||0)*Number(it.qty||1)},0);
+  const bookTotal=items.reduce(function(n,it){
+    const p=shoe(it.sku);
+    return n+((p&&p.price)||0)*Number(it.qty||1);
+  },0);
+  const sameSize=items.length&&items.every(function(it){return String(it.size||"")===String(first.size||"")});
+  return {
+    name:name,
+    phone:phone,
+    sku:first.sku||"",
+    look:first.look||"",
+    size:sameSize?String(first.size||""):"",
+    qty:items.reduce(function(n,it){return n+it.qty},0)||1,
+    items:items,
+    delivery:delivery,
+    deliveryFee:fee,
+    colour:first.colour||"book",
+    extras:extraFix(first.extras),
+    listedPrice:Math.round(pairsListed)!==Math.round(bookTotal)?pairsListed:null,
+    note:String(opts.note||"").trim(),
+    salesman:salesman,
+    owner:owner,
+    source:"website",
+    status:"new",
+    paid:false,
+    nextAction:"Send the first WhatsApp",
+    nextActionAt:null,
+    sitAt:now,
+    createdAt:now,
+    updatedAt:now
+  };
+}
 function xmlEsc(s){
   const amp=String.fromCharCode(38)+"amp;";
   const lt=String.fromCharCode(38)+"lt;";

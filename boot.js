@@ -554,19 +554,22 @@ async function ingest(){
     const r=await fetch(API);
     if(!r.ok) return;
     const j=await r.json();
-    const incoming=(j.leads||[]).map(leadFix);
     const before=S.leads.length;
-    for(const row of incoming){
-      const byId=S.leads.find(l=>l.id===row.id);
-      if(byId){
-        const pt=Number(byId.updatedAt||byId.createdAt||0);
-        const nt=Number(row.updatedAt||row.createdAt||0);
-        if(nt>=pt) Object.assign(byId,row,{id:byId.id});
-      }else{
-        S.leads.unshift(row);
+    const merged=mergeWantIngest(j.leads||[],S.leads);
+    S.leads=merged.rows;
+    const fresh=merged.fresh||[];
+    if(fresh.length){
+      save();
+      if(S.session){
+        if(houseView()){
+          const row=fresh[0];
+          toast="New Want lead — "+(row.name||"Client")+" · "+(row.sku||"");
+          if(fresh.length>1) toast+=" + "+(fresh.length-1);
+        }
+        draw();
       }
+      return;
     }
-    S.leads=keepLeads(S.leads);
     if(S.leads.length!==before) save();
     else vaultPush();
   }catch(e){}

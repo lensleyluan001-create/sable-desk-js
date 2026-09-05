@@ -917,8 +917,8 @@ function buildRank(t,l){
 const IDLE_MS=2*3600000;
 function onSharedBook(seller){
   const id=norm(seller);
-  if(!id||id==="wian") return false;
-  if(id==="luan"||id==="dylan") return true;
+  if(!id) return false;
+  if(id==="luan"||id==="dylan"||id==="wian") return true;
   const u=staffUser(id);
   if(!u||u.status!=="approved") return false;
   return u.sharedBook===true||u.onBook===true;
@@ -934,6 +934,7 @@ function sharedBookSellers(){
   }
   add("dylan");
   add("luan");
+  add("wian");
   (S.users||[]).forEach(function(u){
     if(u&&u.status==="approved") add(u.seller||u.x);
   });
@@ -950,7 +951,7 @@ function paidPairsSold(seller){
 }
 function pickAssignee(){
   const sellers=sharedBookSellers();
-  const order={dylan:0,luan:1};
+  const order={dylan:0,luan:1,wian:2};
   sellers.sort(function(a,b){
     const pa=paidPairsSold(a);
     const pb=paidPairsSold(b);
@@ -960,9 +961,7 @@ function pickAssignee(){
     if(ta!==tb) return ta-tb;
     return a<b?-1:a>b?1:0;
   });
-  const who=sellers[0];
-  if(!who||who==="wian") return null;
-  return who;
+  return sellers[0]||null;
 }
 function isWaitLane(l){
   if(!l) return false;
@@ -1008,7 +1007,7 @@ function idleLeadsForAssign(){
 function autoAssignPlan(){
   if(!S.session||!houseView()) return [];
   const who=pickAssignee();
-  if(!who||who==="wian") return [];
+  if(!who) return [];
   const idle=idleLeadsForAssign();
   const plan=[];
   for(let i=0;i<idle.length;i++){

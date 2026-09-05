@@ -596,7 +596,12 @@ function deskChips(kind){
   const n=id=>{
     if(kind==="todo"){
       const rows=id==="all"?S.leads.filter(l=>!bookOf(l)):S.leads.filter(l=>bookOf(l)===id);
-      return rows.filter(l=>{const t=nextTodo(l);return t&&t.lane==="now"}).length;
+      return rows.filter(l=>{
+        const t=nextTodo(l);
+        if(!t) return false;
+        if(t.lane==="now") return true;
+        return slaOf(t,l).paySla;
+      }).length;
     }
     const rows=id==="all"?S.leads:S.leads.filter(l=>bookOf(l)===id);
     return rows.filter(l=>l.status!=="lost").length;
@@ -630,9 +635,13 @@ function todoAge(it){
   const label=heat==="fresh"?"Under 30 min":heat==="warm"?"Over 30 min":"Over 1 hour";
   return '<span class="todo-age '+heat+'" title="'+esc(label)+'">'+sitLabel(ms)+"</span>";
 }
+function nextActionClose(l){
+  return /eft received|close the card/i.test(String(l&&l.nextAction||""));
+}
 function nextTodo(l){
   if(!l||l.status==="lost") return null;
   if(l.status==="closed"&&l.paid) return null;
+  if(nextActionClose(l)) return {kind:"close",step:String(l.nextAction||"EFT received. Close the card."),cta:"Mark closed",done:true,wa:false,lane:"now"};
   const now=Date.now();
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
   const waiting=due>now;
@@ -648,10 +657,62 @@ function nextTodo(l){
     return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   }
   if(!l.paid){
-    const sent=/invoice|eft|pay/i.test(String(l.nextAction||""));
+    const na=String(l.nextAction||"");
+    const sent=/invoice|eft|pay/i.test(na)&&!nextActionClose(l);
     return {kind:"pay",step:sent?"Chase the EFT":"Send the invoice",cta:sent?"Chase EFT":"Send invoice",done:true,wa:true,lane:"now"};
   }
   return {kind:"follow",step:l.nextAction||"Follow up",cta:"WhatsApp",done:true,wa:true,lane:"now"};
+}
+function isPayConfirm(t,l){
+  if(!l||l.paid||l.status==="lost") return false;
+  if(nextActionClose(l)) return false;
+  if(t&&t.kind==="close") return false;
+  if(t&&t.kind==="pay") return true;
+  const na=String((t&&t.step)||l.nextAction||"");
+  return /invoice|eft|pay/i.test(na);
+}
+function slaOf(t,l,wait){
+  t=t||nextTodo(l);
+  wait=wait!=null?wait:sitMs(l);
+  if(!t||!l||l.status==="lost"||(l.status==="closed"&&l.paid)){
+    return {needsLuan:false,escalateStaff:false,paySla:false,sla:false};
+  }
+  const paySla=isPayConfirm(t,l)&&!l.paid&&wait>3600000;
+  const nowLane=(t.lane||"now")==="now"||paySla;
+  const escalateStaff=nowLane&&wait>2*3600000;
+  const needsLuan=paySla||(nowLane&&wait>3*3600000);
+  return {needsLuan:!!needsLuan,escalateStaff:!!escalateStaff,paySla:!!paySla,sla:!!(needsLuan||escalateStaff)};
+}
+function staffUser(seller){
+  const id=norm(seller);
+  if(!id) return null;
+  return (S.users||[]).find(function(u){
+    return norm(u.seller)===id||norm(u.x)===id||norm(u.name)===id||norm((u.name||"").split(" ")[0])===id;
+  })||null;
+}
+function staffPhoneOf(seller){
+  const u=staffUser(seller);
+  if(!u) return "";
+  const p=u.phone||u.whatsapp||u.wa||"";
+  return digits(p).length>=9?p:"";
+}
+function slaStaffText(it){
+  const l=it&&it.lead;
+  if(!l) return "";
+  const who=SL[bookOf(l)]||bookOf(l)||"Sales";
+  const age=sitLabel(it.wait!=null?it.wait:sitMs(l));
+  const sku=[l.sku,l.look,l.size?("UK "+l.size):""].filter(Boolean).join(" ");
+  return who+", SLA on "+(l.name||"this ticket")+(sku?(" · "+sku):"")+". "+todoVerb(it)+" · sitting "+age+". Action the desk now. Staff ping only — do not send this to the client.";
+}
+function kindRank(t){
+  if(!t) return 9;
+  return t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:t.kind==="pay"?3:t.kind==="size"?4:t.kind==="follow"?6:t.lane==="wait"?80:9;
+}
+function todoRank(t,sla){
+  const k=kindRank(t);
+  if(sla&&sla.needsLuan) return k;
+  if(sla&&sla.escalateStaff) return 10+k;
+  return 20+k;
 }
 function todoWaText(it){
   const l=it&&it.lead;
@@ -664,7 +725,7 @@ function todoWaText(it){
 }
 function todoVerb(it){
   if(!it) return "";
-  if(it.kind==="close") return "Close the sale";
+  if(it.kind==="close") return it.step&&it.step!=="EFT is in"?it.step:"Close the sale";
   if(it.kind==="take") return "Take this lead";
   if(it.kind==="whatsapp") return "Send the first WhatsApp";
   if(it.kind==="size") return /chase/i.test(it.step)?"Chase the size":"Ask for UK size";
@@ -700,15 +761,15 @@ function buildTodos(){
   }else{
     rows=S.leads.filter(l=>bookOf(l)===mine);
   }
-  const now=Date.now();
   const items=[];
   for(const l of rows){
     let t=nextTodo(l);
     if(!t) continue;
     if(houseAll&&t.lane==="now") t={kind:"take",step:"Not on a book yet.",cta:"Take",done:false,wa:false,lane:"now"};
     const wait=sitMs(l);
-    const overdue=t.lane==="now"&&(t.kind==="follow"||t.kind==="pay"||wait>2*86400000);
-    const rank=t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:overdue&&t.kind==="pay"?3:t.kind==="size"?4:t.kind==="pay"?5:t.kind==="follow"?6:t.lane==="wait"?80:9;
+    const sla=slaOf(t,l,wait);
+    const lane=sla.paySla&&t.lane==="wait"?"now":(t.lane||"now");
+    const rank=todoRank({kind:t.kind,lane:lane},sla);
     items.push({
       id:t.kind+"-"+l.id,
       kind:t.kind,
@@ -716,12 +777,16 @@ function buildTodos(){
       cta:t.cta,
       done:t.done,
       wa:t.wa,
-      lane:t.lane||"now",
+      lane:lane,
       lead:l,
       due:l.nextActionAt||l.updatedAt||l.createdAt,
-      overdue:!!overdue,
+      overdue:!!(sla.escalateStaff||sla.needsLuan),
       wait,
-      rank
+      rank,
+      needsLuan:!!sla.needsLuan,
+      escalateStaff:!!sla.escalateStaff,
+      paySla:!!sla.paySla,
+      sla:!!sla.sla
     });
   }
   items.sort((a,b)=>a.rank-b.rank||b.wait-a.wait);
@@ -732,27 +797,48 @@ function todoMeta(it){
   const t=ticket(l);
   return [t.qty>1?(t.qty+" pairs"):"", l.sku, l.look, l.size?("UK "+l.size):""].filter(Boolean).join(" · ");
 }
+function slaFlags(it){
+  if(!it||!it.sla) return "";
+  return '<span class="todo-flags">'
+    +(it.needsLuan?'<span class="todo-flag luan">Needs Luan</span>':"")
+    +'<span class="todo-flag sla">'+(it.needsLuan?"SLA":"Escalate")+"</span>"
+    +"</span>";
+}
+function slaCta(it){
+  if(!it||!it.escalateStaff) return "";
+  const l=it.lead;
+  if(!l) return "";
+  const seller=bookOf(l);
+  if(!seller||seller===mySeller()) return "";
+  const phone=staffPhoneOf(seller);
+  const text=slaStaffText(it);
+  const href=phone?wa(phone,text):"";
+  const who=SL[seller]||"salesperson";
+  if(href) return '<a class="ghost" href="'+href+'" target="_blank" rel="noreferrer">WhatsApp '+esc(who)+"</a>";
+  return '<button class="ghost" type="button" data-copy-sla="'+esc(it.id)+'">Copy '+esc(who)+" ping</button>";
+}
 function todoCta(it){
   const l=it.lead;
   if(!l) return "";
   const href=it.wa?wa(l.phone,todoWaText(it)):"";
-  if(it.kind==="close") return '<button class="solid tight" type="button" data-done="'+esc(it.id)+'">Mark closed</button>';
-  if(it.kind==="take") return '<button class="solid tight" type="button" data-take="'+l.id+'">Take onto my book</button>';
-  if(it.kind==="size"){
+  let out="";
+  if(it.kind==="close") out='<button class="solid tight" type="button" data-done="'+esc(it.id)+'">Mark closed</button>';
+  else if(it.kind==="take") out='<button class="solid tight" type="button" data-take="'+l.id+'">Take onto my book</button>';
+  else if(it.kind==="size"){
     const ask=href?'<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp size</a>':"";
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
-    return ask+sizes+todoPendBtn(l,it);
-  }
-  if(it.kind==="pay"){
-    return '<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
+    out=ask+sizes+todoPendBtn(l,it);
+  }else if(it.kind==="pay"){
+    out='<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
       (href?'<a class="ghost" href="'+href+'" target="_blank" rel="noreferrer" data-wadone="'+esc(it.id)+'">WhatsApp EFT</a>':"")+
       '<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
-  }
-  if(href){
+  }else if(href){
     const mark=it.done?' data-wadone="'+esc(it.id)+'"':"";
-    return '<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>"+todoPendBtn(l,it);
+    out='<a class="solid tight" href="'+href+'" target="_blank" rel="noreferrer"'+mark+">"+esc(it.cta)+"</a>"+todoPendBtn(l,it);
+  }else{
+    out='<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+todoPendBtn(l,it);
   }
-  return '<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>'+todoPendBtn(l,it);
+  return out+slaCta(it);
 }
 function todoPendBtn(l,it){
   if(!l||!it||it.kind==="close"||it.kind==="take"||it.lane==="wait") return "";
@@ -765,8 +851,10 @@ function todoHero(it,nNow){
   const img=p?'<img src="'+p.img+'" alt="'+esc(p.sku)+'">':"<div></div>";
   const of=nNow>1?("Next · 1 of "+nNow):"Next";
   const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
-  return '<div class="todo-hero '+heat+'">'+
-    '<div class="todo-hero-head"><p class="kicker">'+of+'</p>'+todoAge(it)+"</div>"+
+  const sla=it.sla?" sla":"";
+  const luan=it.needsLuan?" luan":"";
+  return '<div class="todo-hero '+heat+sla+luan+'">'+
+    '<div class="todo-hero-head"><p class="kicker">'+of+'</p><span class="todo-head-meta">'+slaFlags(it)+todoAge(it)+"</span></div>"+
     '<p class="todo-verb">'+esc(todoVerb(it))+"</p>"+
     '<div class="todo-hero-row">'+
       '<div class="todo-shot">'+img+"</div>"+
@@ -783,15 +871,17 @@ function todoLine(it,n){
   const l=it.lead;
   if(!l) return "";
   const heat=sitHeat(it.wait!=null?it.wait:sitMs(l));
+  const sla=it.sla?" sla":"";
+  const luan=it.needsLuan?" luan":"";
   const num=n!=null?'<span class="todo-ix">'+n+"</span>":'<span class="todo-ix mute"></span>';
-  return '<button class="todo-line '+heat+'" type="button" data-go="person" data-id="'+l.id+'">'+
+  return '<button class="todo-line '+heat+sla+luan+'" type="button" data-go="person" data-id="'+l.id+'">'+
     num+
     '<span class="todo-who">'+
       '<p class="name">'+esc(l.name||"No name")+nametag(l)+"</p>"+
       '<p class="todo-step">'+esc(todoVerb(it))+"</p>"+
       '<p class="meta">'+esc(todoMeta(it))+"</p>"+
     "</span>"+
-    todoAge(it)+
+    '<span class="todo-line-meta">'+slaFlags(it)+todoAge(it)+"</span>"+
   "</button>";
 }
 function todoQueue(items,start){
@@ -802,7 +892,11 @@ function todoBooks(){
   if(!houseView()||deskFilter!=="all") return "";
   const bits=SELLERS.map(s=>{
     const rows=S.leads.filter(l=>bookOf(l)===s);
-    const nows=rows.map(l=>({l:l,t:nextTodo(l)})).filter(x=>x.t&&x.t.lane==="now");
+    const nows=rows.map(l=>({l:l,t:nextTodo(l)})).filter(x=>{
+      if(!x.t) return false;
+      if(x.t.lane==="now") return true;
+      return slaOf(x.t,x.l).paySla;
+    });
     nows.sort((a,b)=>buildRank(a.t,a.l)-buildRank(b.t,b.l));
     const next=nows[0];
     const line=next?(todoVerb({kind:next.t.kind,step:next.t.step})+" · "+(next.l.name||"No name")):"Clear";
@@ -815,7 +909,6 @@ function todoBooks(){
   return '<p class="kicker todo-then">Open a book</p><div class="todo-books">'+bits+"</div>";
 }
 function buildRank(t,l){
-  const wait=Date.now()-(l.updatedAt||l.createdAt||Date.now());
-  const overdue=t.lane==="now"&&(t.kind==="follow"||t.kind==="pay"||wait>2*86400000);
-  return t.kind==="close"?0:t.kind==="take"?1:t.kind==="whatsapp"?2:overdue&&t.kind==="pay"?3:t.kind==="size"?4:t.kind==="pay"?5:t.kind==="follow"?6:80;
+  const wait=sitMs(l);
+  return todoRank(t,slaOf(t,l,wait));
 }

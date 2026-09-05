@@ -357,6 +357,18 @@ function hookDesk(){
       navigator.clipboard.writeText(text).then(done).catch(function(){toast="Use WhatsApp EFT.";draw()});
     }else toast="Use WhatsApp EFT.",draw();
   });
+  document.querySelectorAll("[data-copy-sla]").forEach(b=>b.onclick=function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    const id=b.getAttribute("data-copy-sla");
+    const it=buildTodos().find(x=>x.id===id);
+    const text=it?slaStaffText(it):"";
+    if(!text) return;
+    const done=function(){toast="Staff ping copied. WhatsApp the salesperson yourself — not the client.";draw()};
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){toast=text;draw()});
+    }else{toast=text;draw()}
+  });
   const pnext=document.getElementById("pnext");
   if(pnext) pnext.onsubmit=function(e){
     e.preventDefault();

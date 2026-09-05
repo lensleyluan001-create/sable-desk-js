@@ -266,6 +266,42 @@
       color: var(--hot);
       background: color-mix(in srgb, var(--hot) 16%, var(--card));
     }
+    .todo-head-meta,
+    .todo-line-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      min-width: 0;
+    }
+    .todo-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .todo-flag {
+      display: inline-flex;
+      align-items: center;
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      line-height: 1;
+      padding: 6px 8px;
+      border-radius: 999px;
+      min-height: 24px;
+    }
+    .todo-flag.sla,
+    .todo-flag.luan {
+      color: var(--hot);
+      background: color-mix(in srgb, var(--hot) 16%, var(--card));
+    }
+    .todo-flag.luan {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 45%, transparent);
+    }
     .todo-hero .name {
       font-family: var(--font-body);
       font-size: 17px;

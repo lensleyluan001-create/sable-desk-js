@@ -4,10 +4,10 @@ function viewTodo(){
   const wait=items.filter(it=>it.lane==="wait");
   const houseAll=houseView()&&deskFilter==="all";
   const who=houseAll?"Floor":(SL[deskFilter]||SL[mySeller()]||"Your");
-  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" pending":"");
+  const count=(now.length?now.length+" now":"Clear")+(wait.length?" · "+wait.length+" pending":"")+(items.some(it=>it.needsLuan)?" · Needs Luan":"");
   const sub=houseAll
     ?"Unassigned only. Open a name to work that book."
-    :who+"'s book. Only "+who+"'s people. Green under 30 min, yellow after that, red over an hour.";
+    :who+"'s book. Only "+who+"'s people. Green under 30 min, yellow after that, red over an hour. Sitting 2 hours pings the book. 3 hours, or unpaid EFT over 1 hour, is Needs Luan.";
   const head='<p class="kicker">CRM · '+esc(count)+'</p><h1>To-do</h1><p class="sub">'+esc(sub)+"</p>"+deskChips("todo")+
     '<p class="todo-key" aria-hidden="true"><span class="todo-age fresh">Under 30 min</span><span class="todo-age warm">Over 30 min</span><span class="todo-age hot">Over 1 hour</span></p>';
   if(!now.length&&!wait.length){

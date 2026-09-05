@@ -1,6 +1,7 @@
 function draw(){
   const root=document.getElementById("root");
   if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
+  runIdleAutoAssign();
   root.innerHTML=Desk();
   hookDesk();
   toast="";
@@ -49,6 +50,42 @@ function patchLead(id,fields){
   const next=Object.assign({},prev,fields,{updatedAt:Date.now(),sitAt});
   S.leads[i]=next;
   save();
+}
+function runIdleAutoAssign(){
+  if(!S.session||!houseView()) return;
+  const plan=autoAssignPlan();
+  if(!plan.length) return;
+  const names=[];
+  for(let i=0;i<plan.length;i++){
+    const p=plan[i];
+    const l=p.lead;
+    autoUndo.push({
+      id:l.id,
+      name:l.name||"",
+      owner:l.owner||null,
+      sitAt:l.sitAt,
+      nextAction:l.nextAction||"",
+      nextActionAt:l.nextActionAt||null,
+      to:p.to
+    });
+    patchLead(l.id,p.fields);
+    names.push(l.name||"a lead");
+  }
+  const who=plan[0].to;
+  toast="Auto-assigned to "+(SL[who]||who)+": "+names.slice(0,3).join(", ")+(names.length>3?(" +"+(names.length-3)):"");
+}
+function undoAutoAssign(id){
+  const i=autoUndo.findIndex(function(x){return x.id===id});
+  if(i<0) return;
+  const prev=autoUndo.splice(i,1)[0];
+  autoSkip[id]=true;
+  patchLead(id,{
+    owner:prev.owner,
+    sitAt:prev.sitAt,
+    nextAction:prev.nextAction,
+    nextActionAt:prev.nextActionAt
+  });
+  toast="Back on Floor.";
 }
 function doDone(tid){
   const items=buildTodos();
@@ -224,7 +261,13 @@ function hookDesk(){
     patchLead(personId,fields);
     draw();
   });
-  document.querySelectorAll("[data-assign]").forEach(b=>b.onclick=function(){if(personId){patchLead(personId,{owner:b.getAttribute("data-assign")});draw()}});
+  document.querySelectorAll("[data-assign]").forEach(b=>b.onclick=function(){
+    if(!personId) return;
+    const who=b.getAttribute("data-assign");
+    if(autoSkip[personId]) delete autoSkip[personId];
+    patchLead(personId,{owner:who,sitAt:Date.now()});
+    draw();
+  });
   document.querySelectorAll("[data-paid]").forEach(b=>b.onclick=function(){
     if(!personId) return;
     const on=b.getAttribute("data-paid")==="1";
@@ -403,8 +446,14 @@ function hookDesk(){
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
-    patchLead(b.getAttribute("data-take"),{owner:mySeller(),sitAt:Date.now()});
+    const id=b.getAttribute("data-take");
+    if(autoSkip[id]) delete autoSkip[id];
+    patchLead(id,{owner:mySeller(),sitAt:Date.now()});
     toast="On Sable.";
+    draw();
+  });
+  document.querySelectorAll("[data-undo-assign]").forEach(b=>b.onclick=function(){
+    undoAutoAssign(b.getAttribute("data-undo-assign"));
     draw();
   });
   document.querySelectorAll("[data-locksize]").forEach(b=>b.onclick=function(){

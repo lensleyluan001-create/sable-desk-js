@@ -239,6 +239,8 @@ let S=load();
 let mode="in";
 let tab="todo";
 let toast="";
+let autoUndo=[];
+let autoSkip={};
 let deskFilter="all";
 let boardCol="new";
 let pane="work";
@@ -912,3 +914,127 @@ function buildRank(t,l){
   const wait=sitMs(l);
   return todoRank(t,slaOf(t,l,wait));
 }
+const IDLE_MS=2*3600000;
+function onSharedBook(seller){
+  const id=norm(seller);
+  if(!id||id==="wian") return false;
+  if(id==="luan"||id==="dylan") return true;
+  const u=staffUser(id);
+  if(!u||u.status!=="approved") return false;
+  return u.sharedBook===true||u.onBook===true;
+}
+function sharedBookSellers(){
+  const seen={};
+  const out=[];
+  function add(s){
+    const id=norm(s);
+    if(!onSharedBook(id)||seen[id]) return;
+    seen[id]=true;
+    out.push(id);
+  }
+  add("dylan");
+  add("luan");
+  (S.users||[]).forEach(function(u){
+    if(u&&u.status==="approved") add(u.seller||u.x);
+  });
+  return out;
+}
+function paidPairsSold(seller){
+  let n=0;
+  (S.leads||[]).forEach(function(l){
+    if(!l||!l.paid||l.status==="lost") return;
+    if((bookOf(l)||"floor")!==seller) return;
+    n+=ticket(l).qty;
+  });
+  return n;
+}
+function pickAssignee(){
+  const sellers=sharedBookSellers();
+  const order={dylan:0,luan:1};
+  sellers.sort(function(a,b){
+    const pa=paidPairsSold(a);
+    const pb=paidPairsSold(b);
+    if(pa!==pb) return pa-pb;
+    const ta=order[a]!=null?order[a]:9;
+    const tb=order[b]!=null?order[b]:9;
+    if(ta!==tb) return ta-tb;
+    return a<b?-1:a>b?1:0;
+  });
+  const who=sellers[0];
+  if(!who||who==="wian") return null;
+  return who;
+}
+function isWaitLane(l){
+  if(!l) return false;
+  const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
+  if(due>Date.now()) return true;
+  const t=nextTodo(l);
+  return !!(t&&t.lane==="wait");
+}
+function isDeadLead(l){
+  if(!l) return true;
+  if(l.status==="lost") return true;
+  if(l.status==="closed"&&l.paid) return true;
+  return false;
+}
+function isIdleFloorLead(l){
+  if(isDeadLead(l)||bookOf(l)) return false;
+  if(autoSkip[l.id]) return false;
+  if(sitMs(l)<IDLE_MS) return false;
+  if(isWaitLane(l)) return false;
+  return true;
+}
+function isIdleAssignedLead(l){
+  if(isDeadLead(l)||!bookOf(l)) return false;
+  if(autoSkip[l.id]) return false;
+  if(sitMs(l)<IDLE_MS) return false;
+  if(isWaitLane(l)) return false;
+  if(String(l.nextAction||"").trim()) return false;
+  const st=l.status||"new";
+  if(st==="closed"||st==="lost") return false;
+  return st==="new"||st==="inbox"||st==="working"||st==="contacted";
+}
+function idleLeadsForAssign(){
+  const rows=S.leads||[];
+  const floor=[];
+  const assigned=[];
+  for(let i=0;i<rows.length;i++){
+    const l=rows[i];
+    if(isIdleFloorLead(l)) floor.push(l);
+    else if(isIdleAssignedLead(l)) assigned.push(l);
+  }
+  return floor.concat(assigned);
+}
+function autoAssignPlan(){
+  if(!S.session||!houseView()) return [];
+  const who=pickAssignee();
+  if(!who||who==="wian") return [];
+  const idle=idleLeadsForAssign();
+  const plan=[];
+  for(let i=0;i<idle.length;i++){
+    const l=idle[i];
+    if(bookOf(l)===who) continue;
+    const fields={owner:who,sitAt:Date.now()};
+    if(!String(l.nextAction||"").trim()){
+      fields.nextAction="Auto-assigned — first WhatsApp";
+      fields.nextActionAt=null;
+    }
+    plan.push({id:l.id,lead:l,fields:fields,to:who});
+  }
+  return plan;
+}
+function deskFlash(){
+  const last=autoUndo.length?autoUndo[autoUndo.length-1]:null;
+  const undo=last?' <button class="chip" type="button" data-undo-assign="'+esc(last.id)+'">Undo</button>':"";
+  if(toast){
+    const bad=/need|wrong|type |eight|whatsapp number/i.test(toast);
+    const auto=/auto-assigned|back on floor/i.test(toast);
+    return '<p class="'+(bad?"err":"ok")+(auto?" auto-assign-note":"")+'">'+esc(toast)+(auto?undo:"")+"</p>";
+  }
+  if(last){
+    const who=SL[last.to]||last.to;
+    return '<p class="ok auto-assign-note">Auto-assigned to '+esc(who)+undo+"</p>";
+  }
+  return "";
+}
+

@@ -100,6 +100,23 @@
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .spread { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
     .err { color: var(--hot); font-size: 13px; } .ok { color: var(--good); font-size: 13px; }
+    .owner-chip {
+      display: inline-flex;
+      align-items: center;
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--ink) 8%, var(--card));
+      color: var(--ink);
+    }
+    .auto-assign-note .chip {
+      margin-left: 8px;
+      vertical-align: middle;
+    }
     .empty { color: var(--muted); padding: 8px 0; }
     .shell { display: grid; min-height: 100dvh; background: var(--paper); }
     .side { display: none; }

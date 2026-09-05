@@ -237,7 +237,7 @@ function save(){
 }
 let S=load();
 let mode="in";
-let tab="todo";
+let tab="desk";
 let toast="";
 let autoUndo=[];
 let autoSkip={};
@@ -263,7 +263,7 @@ function house(){
 }
 function enter(u){
   S.session={email:u.email,name:u.name||LUAN.name,role:u.role||"sales",seller:u.seller||"luan"};
-  toast="";tab="todo";personId=null;
+  toast="";tab="desk";personId=null;
   if(houseView()){
     const saved=readDesk();
     deskFilter=SELLERS.indexOf(saved)>=0?saved:(u.seller||"luan");
@@ -586,7 +586,7 @@ function Gate(){
   return '<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Luan email is filled in.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
 }
 function navBtns(){
-  const items=[["todo","To-do","T"],["board","Board","B"],["capture","Capture","C"],["clients","Clients","L"],["meetings","Meetings","M"]];
+  const items=[["desk","Desk","D"],["todo","To-do","T"],["board","Board","B"],["capture","Capture","C"],["clients","Clients","L"],["meetings","Meetings","M"]];
   if(S.session.role==="admin") items.push(["team","Team","A"]);
   return items.map(([id,label,mark])=>{
     const on=tab===id||(id==="clients"&&personId)||(id==="meetings"&&tab==="team");
@@ -1035,5 +1035,116 @@ function deskFlash(){
     return '<p class="ok auto-assign-note">Auto-assigned to '+esc(who)+undo+"</p>";
   }
   return "";
+}
+function standupRows(){
+  const rows=S.leads||[];
+  if(houseView()){
+    if(deskFilter==="all") return rows.slice();
+    return rows.filter(function(l){return bookOf(l)===deskFilter});
+  }
+  const mine=mySeller();
+  return rows.filter(function(l){return bookOf(l)===mine});
+}
+function standupSort(a,b){
+  const ha=a.heat==="hot"?0:a.heat==="warm"?1:2;
+  const hb=b.heat==="hot"?0:b.heat==="warm"?1:2;
+  if(ha!==hb) return ha-hb;
+  return (b.wait||0)-(a.wait||0);
+}
+function standupPack(l,why){
+  const wait=sitMs(l);
+  const t=nextTodo(l);
+  const sla=slaOf(t,l,wait);
+  return {id:l.id,lead:l,wait:wait,heat:sitHeat(wait),why:why,todo:t,sla:sla};
+}
+function standupOverdue(){
+  const out=[];
+  standupRows().forEach(function(l){
+    if(isDeadLead(l)) return;
+    const t=nextTodo(l);
+    if(!t) return;
+    const wait=sitMs(l);
+    const sla=slaOf(t,l,wait);
+    const lane=sla.paySla&&t.lane==="wait"?"now":(t.lane||"now");
+    if(lane!=="now") return;
+    const heat=sitHeat(wait);
+    if(!(heat==="hot"||sla.escalateStaff||sla.needsLuan||sla.paySla)) return;
+    const why=sla.needsLuan?"Needs Luan":sla.paySla?"Unpaid EFT over 1 hour":sla.escalateStaff?"SLA sitting over 2 hours":(todoVerb(t)+" · over 1 hour");
+    out.push(standupPack(l,why));
+  });
+  out.sort(standupSort);
+  return out;
+}
+function standupUnpaid(){
+  const out=[];
+  standupRows().forEach(function(l){
+    if(!l||l.paid||isDeadLead(l)||nextActionClose(l)) return;
+    const t=nextTodo(l);
+    if(!(l.invRef||isPayConfirm(t,l))) return;
+    if(sitMs(l)<3600000) return;
+    const why=l.invRef?"Invoice out · unpaid over 1 hour":(todoVerb(t)||"Chase the EFT");
+    out.push(standupPack(l,why));
+  });
+  out.sort(standupSort);
+  return out;
+}
+function standupDylan(){
+  const out=[];
+  standupRows().forEach(function(l){
+    if(isDeadLead(l)) return;
+    const st=l.status||"new";
+    if(st==="closed") return;
+    const book=bookOf(l);
+    const named=/dylan|waiting on dylan/i.test(String(l.nextAction||""));
+    if(!(book==="dylan"||named)) return;
+    if(sitMs(l)<IDLE_MS) return;
+    out.push(standupPack(l,named?"Waiting on Dylan":"Dylan book · idle over 2 hours"));
+  });
+  out.sort(standupSort);
+  return out;
+}
+function standupIdle(){
+  const out=[];
+  standupRows().forEach(function(l){
+    if(!(isIdleFloorLead(l)||isIdleAssignedLead(l))) return;
+    out.push(standupPack(l,bookOf(l)?"No next step · idle over 2 hours":"Floor · no next step"));
+  });
+  out.sort(standupSort);
+  return out;
+}
+function standupLuan(){
+  const out=[];
+  standupRows().forEach(function(l){
+    if(isDeadLead(l)) return;
+    const t=nextTodo(l);
+    const wait=sitMs(l);
+    const sla=slaOf(t,l,wait);
+    const book=bookOf(l);
+    const heat=sitHeat(wait);
+    const nowLane=!!(t&&((sla.paySla&&t.lane==="wait")||t.lane==="now"));
+    let why="";
+    if(sla.needsLuan) why="Needs Luan";
+    else if(book==="luan"&&heat==="hot"&&nowLane) why="Luan book · hot";
+    else if(!book&&t&&t.lane==="now") why="Floor · house decision";
+    if(!why) return;
+    out.push(standupPack(l,why));
+  });
+  out.sort(standupSort);
+  return out;
+}
+function buildStandup(){
+  return {
+    overdue:standupOverdue(),
+    unpaid:standupUnpaid(),
+    dylan:standupDylan(),
+    idle:standupIdle(),
+    luan:standupLuan()
+  };
+}
+function standupCta(kind,row){
+  const l=row&&row.lead;
+  if(!l) return "";
+  if(kind==="unpaid") return '<button class="solid tight" type="button" data-todopaid="'+l.id+'">Confirm paid</button>';
+  return '<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>';
 }
 

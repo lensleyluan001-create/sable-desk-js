@@ -546,5 +546,5 @@ draw();
 ingest();
 setInterval(ingest,20000);
 setInterval(function(){
-  if(S.session&&tab==="todo"&&!personId) draw();
+  if(S.session&&(tab==="todo"||tab==="desk")&&!personId) draw();
 },30000);

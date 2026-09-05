@@ -2,7 +2,9 @@
   const PHOTO = "https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/main/views/";
   const root = document.getElementById("track");
   function esc(s) {
-    return String(s || "").replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """);
+    return String(s || "").replace(/[&<>"]/g, function (c) {
+      return "&#" + c.charCodeAt(0) + ";";
+    });
   }
   function paint(html) {
     if (root) root.innerHTML = html;

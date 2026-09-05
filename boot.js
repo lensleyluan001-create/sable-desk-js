@@ -538,6 +538,24 @@ function hookDesk(){
       navigator.clipboard.writeText(href).then(done).catch(function(){toast=href;draw()});
     }else{toast=href;draw()}
   });
+  document.querySelectorAll("[data-copytrack]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-copytrack")||personId;
+    const l=S.leads.find(x=>x.id===id);
+    const href=trackUrl(l);
+    if(!href) return;
+    const done=function(){toast="Track link copied. They see the pair and the stage — not the money.";draw()};
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(href).then(done).catch(function(){toast=href;draw()});
+    }else{toast=href;draw()}
+  });
+  document.querySelectorAll("[data-track]").forEach(b=>b.onclick=function(){
+    if(!personId) return;
+    const v=String(b.getAttribute("data-track")||"");
+    const stage=v==="ready"||v==="dispatch"?v:"";
+    patchLead(personId,{trackStage:stage});
+    toast=stage==="ready"?"Ready for collect — on their track page.":stage==="dispatch"?"Out for delivery — on their track page.":"Track stage cleared.";
+    draw();
+  });
   document.querySelectorAll("[data-proofzoom]").forEach(b=>b.onclick=function(){
     const id=b.getAttribute("data-proofzoom");
     const l=S.leads.find(x=>x.id===id);

@@ -277,6 +277,8 @@ function viewPerson(){
   const hideRow=hideChips(l.colour||"book","data-phide");
   const delChips=[["collect","Collect"],["local","Local R100"],["int","International R300"]].map(([id,lab])=>'<button class="chip '+(l.delivery===id?"on":"")+'" type="button" data-pdel="'+id+'">'+lab+"</button>").join("");
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
+  const flag=trackFlag(l);
+  const trackChips=(l.status==="lost"||(l.status==="closed"&&l.paid))?"":('<label>Client track</label><div class="chips"><button class="chip '+(flag==="ready"?"on":"")+'" type="button" data-track="ready">Ready for collect</button><button class="chip '+(flag==="dispatch"?"on":"")+'" type="button" data-track="dispatch">Out for delivery</button>'+(flag?'<button class="chip" type="button" data-track="">Clear</button>':"")+"</div>");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div><div class="line"><span>EFT</span><span>'+esc(payStateLabel(payState(l)))+"</span></div>"+proofCardHtml(l)+"</div>";
   const proofOn=hasProof(l);
@@ -284,7 +286,7 @@ function viewPerson(){
     ?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>'
     :'<button class="'+(proofOn?"chip on":"chip")+'" type="button" data-paid="1">Mark paid</button>';
   const rejectBtn=(!l.paid&&proofOn)?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"";
-  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button><button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);
@@ -298,6 +300,7 @@ function viewPerson(){
     orderLines+
     sizeBlock+
     '<label>Stage</label><div class="chips">'+stageChips+"</div>"+
+    trackChips+
     desk+money+
     '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
     '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(l.nextAction||"")+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
@@ -323,6 +326,7 @@ function viewInvoice(){
     '<button class="solid tight" type="button" id="inv-print">Print / PDF</button>'+
     (waPay?'<a class="chip on" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'">WhatsApp</a>':'')+
     '<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+
+    '<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+
     (l.paid?'<span class="chip good on">Paid</span>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+
     (!l.paid?proofDropHtml(l):"")+
     (hasProof(l)&&!l.paid?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"")+

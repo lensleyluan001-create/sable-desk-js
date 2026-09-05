@@ -182,6 +182,7 @@ function leadFix(l){
     proofAt:l.proofAt||null,
     proofBy:String(l.proofBy||""),
     proofStatus:String(l.proofStatus||""),
+    trackStage:trackFlag({trackStage:l.trackStage,nextAction:""}),
     createdAt:l.createdAt||Date.now(),
     updatedAt:l.updatedAt||l.createdAt||Date.now(),
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
@@ -659,7 +660,8 @@ function invMsg(l){
   const custom=t.custom?" Custom pair.":"";
   const ship=t.fee?("Delivery "+zar(t.fee)+" ("+delLabel(l.delivery)+")"):"Collect — no delivery";
   const bank=bankLines();
-  return who+", SABLE.CO invoice "+ref+". "+lines+"."+custom+" Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from Sable with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT.";
+  const track=trackUrl(l);
+  return who+", SABLE.CO invoice "+ref+". "+lines+"."+custom+" Listed "+zar(t.listed)+(t.extras?(". Extras "+zar(t.extras)):"")+". "+ship+". EFT due "+zar(t.due)+". Use reference "+ref+"."+(bank.length?" "+bank.join(". ")+".":" Bank details from Sable with this message.")+" Reply paid when the transfer is sent. Pair confirmed after EFT."+(track?(" Track your order: "+track):"");
 }
 function localAt(iso){
   if(!iso) return "";
@@ -689,6 +691,87 @@ function proofLink(l){
   if(l.id) return base+"?proof="+encodeURIComponent(l.id);
   if(l.invRef) return base+"?ref="+encodeURIComponent(l.invRef);
   return "";
+}
+function trackUrl(l){
+  if(!l||!l.id) return "";
+  return "https://sable-floor.vercel.app/track.html?t="+encodeURIComponent(l.id);
+}
+function trackFlag(l){
+  const raw=String(l&&l.trackStage||"").trim().toLowerCase();
+  if(raw==="ready"||raw==="collect") return "ready";
+  if(raw==="dispatch"||raw==="sent"||raw==="delivery") return "dispatch";
+  return "";
+}
+function trackHint(l){
+  const na=String(l&&l.nextAction||"");
+  if(/out for delivery|dispatched|on the way|sent with courier/i.test(na)) return "dispatch";
+  if(/ready for collect|ready to collect|ready for collection/i.test(na)) return "ready";
+  return trackFlag(l);
+}
+function trackPublic(l){
+  if(!l||!l.id) return null;
+  const rawItems=Array.isArray(l.items)&&l.items.length?l.items:[l];
+  const items=rawItems.map(function(it){
+    return {
+      sku:String(it.sku||""),
+      look:String(it.look||""),
+      size:String(it.size||""),
+      qty:Math.max(1, Number(it.qty||1)||1)
+    };
+  }).filter(function(it){return it.sku||it.look});
+  const qty=items.reduce(function(n,it){return n+it.qty},0)||1;
+  const send=l.delivery==="local"||l.delivery==="int";
+  const flag=trackHint(l);
+  const lost=String(l.status||"")==="lost";
+  const closedPaid=String(l.status||"")==="closed"&&!!l.paid;
+  const paid=!!l.paid;
+  const st=String(l.status||"new");
+  const fresh=st==="new"||st==="inbox";
+  const sized=!needsSize(l);
+  const invoiced=!!String(l.invRef||"").trim()||hasProof(l)||/invoice|eft|pay/i.test(String(l.nextAction||""));
+  const received=((fresh||(st==="contacted"&&!sized))&&!invoiced&&!paid&&!flag&&!closedPaid)?"now":"done";
+  let making="wait";
+  if(received==="now") making="wait";
+  else if(closedPaid||paid||flag||invoiced) making="done";
+  else if(!fresh||sized) making="now";
+  let payment="wait";
+  const payNow=(invoiced||hasProof(l))&&!paid;
+  if(paid) payment="done";
+  else if(payNow) payment="now";
+  if(making==="now"&&!payNow&&!paid) payment="wait";
+  let ready="wait";
+  if(closedPaid) ready="done";
+  else if(flag&&paid) ready="now";
+  const finished=closedPaid?"done":"wait";
+  const payLabel=paid?"Payment received":"Waiting for payment";
+  const readyLabel=send?"Out for delivery":"Ready for collect";
+  const steps=[
+    {id:"received",label:"Order received",state:lost&&received==="now"?"done":received},
+    {id:"making",label:qty>1?"Making your pairs":"Making your pair",state:lost?"wait":making},
+    {id:"payment",label:payLabel,state:lost?"wait":payment},
+    {id:"ready",label:readyLabel,state:lost?"wait":ready},
+    {id:"done",label:"Done",state:lost?"wait":finished}
+  ];
+  if(lost){
+    steps[0].state="done";
+  }
+  let headline="Your Sable order.";
+  if(lost) headline="This order is no longer going ahead.";
+  else if(closedPaid) headline="Done.";
+  else if(ready==="now") headline=readyLabel+".";
+  else if(paid) headline="Payment received. We will tell you when it is ready.";
+  else if(payment==="now") headline="Waiting for payment.";
+  else if(making==="now") headline=qty>1?"We are making your pairs.":"We are making your pair.";
+  else headline="We have your order.";
+  return {
+    name:String(l.name||"").trim().split(/\s+/)[0]||"Your order",
+    items:items,
+    delivery:send?"send":"collect",
+    collect:!send,
+    lost:lost,
+    steps:steps,
+    headline:headline
+  };
 }
 function Gate(){
   let form="";

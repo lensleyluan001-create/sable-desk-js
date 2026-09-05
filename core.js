@@ -15,6 +15,40 @@ function isHouse(id){const q=norm(id);return !q||q===LUAN.email||q===LUAN.x||q==
 function uid(){return "ld-"+Math.random().toString(36).slice(2,10)}
 function zar(n){if(n==null||n==="")return "POA";return "R"+Number(n).toLocaleString("en-ZA")}
 function digits(p){return String(p||"").replace(/\D/g,"")}
+function phoneKey(p){
+  let d=digits(p);
+  if(d.length<9) return "";
+  if(d[0]==="0") d="27"+d.slice(1);
+  if(d.indexOf("27")===0&&d.length>11&&d[2]==="0") d="27"+d.slice(3);
+  return d;
+}
+function samePairTicket(a,b){
+  if(!a||!b) return false;
+  const pa=phoneKey(a.phone), pb=phoneKey(b.phone);
+  if(!pa||pa!==pb) return false;
+  if(String(a.sku||"").trim().toLowerCase()!==String(b.sku||"").trim().toLowerCase()) return false;
+  return String(sizeOf(a)||a.size||"")===String(sizeOf(b)||b.size||"");
+}
+function clientGroups(rows){
+  const order=[];
+  const map={};
+  (rows||[]).forEach(function(l){
+    if(!l) return;
+    const k=phoneKey(l.phone)||("id:"+l.id);
+    if(!map[k]){map[k]=[];order.push(k)}
+    map[k].push(l);
+  });
+  return order.map(function(k){
+    const tickets=map[k].slice().sort(function(a,b){
+      const ra=a.status==="lost"?2:a.status==="closed"?1:0;
+      const rb=b.status==="lost"?2:b.status==="closed"?1:0;
+      if(ra!==rb) return ra-rb;
+      return Number(b.updatedAt||b.createdAt||0)-Number(a.updatedAt||a.createdAt||0);
+    });
+    const named=tickets.find(function(t){return String(t.name||"").trim()&&t.status!=="lost"})||tickets[0];
+    return {key:k,name:named&&named.name||"",phone:named&&named.phone||tickets[0].phone,tickets:tickets};
+  });
+}
 function wa(phone,text){let d=digits(phone);if(d.length<9)return "";if(d[0]==="0")d="27"+d.slice(1);return "https://wa.me/"+d+(text?"?text="+encodeURIComponent(text):"")}
 function colOf(st){if(st==="new"||st==="inbox")return "new";if(st==="closed")return "closed";if(st==="lost")return "lost";return "working"}
 function splitOf(seller){if(seller==="wian")return {wian:.2,luan:.4,dylan:.3,house:.1};if(seller==="luan")return {wian:0,luan:.6,dylan:.3,house:.1};if(seller==="dylan")return {wian:0,luan:0,dylan:.9,house:.1};return {wian:0,luan:0,dylan:0,house:1}}

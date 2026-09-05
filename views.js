@@ -237,9 +237,22 @@ function viewCapture(){
     '<label>Note</label><input name="note" value="'+esc(cap.note)+'" placeholder="Tan hide. Call after 6." /></details></form>';
 }
 function viewClients(){
-  const rows=leads();
-  const q="";
-  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. People stay on Sable. Lost is a stage, not a delete.</p>'+deskChips()+(rows.length?rows.map(l=>'<div class="lead"><div class="spread"><p class="name">'+esc(l.name)+nametag(l)+'</p><p class="meta">'+esc(l.status)+'</p></div><p class="meta">'+esc([l.sku,l.look,l.phone].filter(Boolean).join(" · "))+'</p><div class="row">'+(wa(l.phone,firstMsg(l))?'<a class="chip on" href="'+wa(l.phone,firstMsg(l))+'" data-wa="'+l.id+'" target="_blank" rel="noreferrer">WhatsApp</a>':"")+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div></div>').join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
+  const groups=clientGroups(leads());
+  function ticketBits(l){
+    const t=ticket(l);
+    const st=l.status==="lost"?"Lost":(l.status==="closed"?(l.paid?"Closed · paid":"Closed"):(l.paid?"Paid":"Open"));
+    return [l.sku,l.look,l.size?("UK "+l.size):(t.items&&t.items.length>1?"sizes on ticket":"size open"),st,t.qty>1?(t.qty+" pairs"):""].filter(Boolean).join(" · ");
+  }
+  function card(g){
+    const head=g.tickets[0];
+    const n=g.tickets.length;
+    const waHref=wa(g.phone,firstMsg(head));
+    const lines=g.tickets.map(function(l){
+      return '<div class="spread" style="margin-top:8px;gap:8px"><p class="meta" style="margin:0">'+esc(ticketBits(l))+'</p><button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button></div>';
+    }).join("");
+    return '<div class="lead"><div class="spread"><p class="name">'+esc(g.name||"No name")+nametag(head)+'</p><p class="meta">'+(n===1?"1 ticket":n+" tickets")+'</p></div><p class="meta">'+esc(g.phone||"No WhatsApp")+'</p>'+(waHref?'<div class="row"><a class="chip on" href="'+waHref+'" data-wa="'+head.id+'" target="_blank" rel="noreferrer">WhatsApp</a></div>':"")+lines+"</div>";
+  }
+  return '<p class="kicker">CRM</p><h1>Clients</h1><p class="sub">One card per person. Tickets stay split by size. Lost is a stage, not a delete.</p>'+deskChips()+(groups.length?groups.map(card).join(""):'<p class="empty">No people on Sable yet. Capture one.</p>')+'<button class="solid" type="button" data-tab="capture">Capture</button>';
 }
 function viewMeetings(){
   const now=Date.now();

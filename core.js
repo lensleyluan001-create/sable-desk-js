@@ -152,6 +152,12 @@ function leadFix(l){
   const web=src==="web"||src==="website"||src.indexOf("want")>=0||src.indexOf("lookbook")>=0;
   let nextAction=String(l.nextAction||l.next||"").trim();
   if(!nextAction&&status==="new"&&web) nextAction="Send the first WhatsApp";
+  const paid=Boolean(l.paid);
+  let healed=false;
+  if(!paid&&status!=="lost"&&/eft received|close the card/i.test(nextAction)){
+    nextAction=hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
+    healed=true;
+  }
   const own=norm(l.owner);
   const owner=(own&&SELLERS.indexOf(own)>=0)?own:(matchSeller(l.salesman)||null);
   return {
@@ -168,7 +174,7 @@ function leadFix(l){
     note:String(l.note||""),
     owner:owner,
     salesman:String(l.salesman||"").trim(),
-    paid:Boolean(l.paid),
+    paid:paid,
     paidAmount:Number(l.paidAmount||0)||0,
     delivery:l.delivery||"collect",
     deliveryFee:Number(l.deliveryFee||0)||0,
@@ -184,7 +190,7 @@ function leadFix(l){
     proofStatus:String(l.proofStatus||""),
     trackStage:trackFlag({trackStage:l.trackStage,nextAction:""}),
     createdAt:l.createdAt||Date.now(),
-    updatedAt:l.updatedAt||l.createdAt||Date.now(),
+    updatedAt:healed?Date.now():(l.updatedAt||l.createdAt||Date.now()),
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
   };
 }
@@ -836,6 +842,27 @@ function todoAge(it){
 function nextActionClose(l){
   return !!(l&&l.paid&&/eft received|close the card/i.test(String(l.nextAction||"")));
 }
+function staleCloseCopy(l){
+  return !!(l&&!l.paid&&l.status!=="lost"&&/eft received|close the card/i.test(String(l.nextAction||"")));
+}
+function honestNextAction(l){
+  if(!l) return "";
+  if(l.status==="lost") return String(l.nextAction||"Lost");
+  if(staleCloseCopy(l)) return hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
+  return String(l.nextAction||"");
+}
+function healUnpaidCloseCopy(){
+  let n=0;
+  S.leads=(S.leads||[]).map(function(l){
+    if(!staleCloseCopy(l)) return l;
+    n++;
+    return leadFix(Object.assign({},l,{
+      nextAction:honestNextAction(l),
+      updatedAt:Date.now()
+    }));
+  });
+  return n;
+}
 function hasProof(l){
   if(!l) return false;
   if(String(l.proofStatus||"")==="rejected") return false;
@@ -876,8 +903,12 @@ function isWaitingOnMoney(l){
 function nextStepLabel(l){
   if(!l) return "Open the card";
   if(l.status==="lost") return String(l.nextAction||"Lost");
+  if(staleCloseCopy(l)) return hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
   const t=nextTodo(l);
-  if(t&&t.step) return t.step;
+  if(t&&t.step){
+    if(!l.paid&&/eft received|close the card/i.test(t.step)) return hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
+    return t.step;
+  }
   return String(l.nextAction||(l.status==="new"||l.status==="inbox"?"Send the first WhatsApp":"Open the card"));
 }
 function nextTodo(l){
@@ -887,7 +918,7 @@ function nextTodo(l){
   if(hasProof(l)&&!l.paid) return {kind:"verify",step:"Verify EFT",cta:"Mark paid",done:true,wa:false,lane:"now"};
   const now=Date.now();
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
-  const waiting=due>now;
+  const waiting=due>now&&!staleCloseCopy(l);
   if(waiting){
     const why=l.nextAction||(needsSize(l)?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
@@ -1084,7 +1115,11 @@ function todoVerb(it){
   if(it.kind==="verify") return "Verify EFT";
   if(it.kind==="pay") return /chase/i.test(it.step)?"Chase the EFT":"Send the invoice";
   if(it.kind==="follow") return "Follow up";
-  if(it.kind==="wait") return it.step||"Waiting on them";
+  if(it.kind==="wait"){
+    if(it.lead&&staleCloseCopy(it.lead)) return hasProof(it.lead)?"Proof attached — verify EFT":"Chase the EFT";
+    if(!it.lead&&/eft received|close the card/i.test(String(it.step||""))) return "Chase the EFT";
+    return it.step||"Waiting on them";
+  }
   return it.step||"Open";
 }
 function todoStage(it){

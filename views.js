@@ -303,7 +303,7 @@ function viewPerson(){
     trackChips+
     desk+money+
     '<details class="card more"><summary>Lock the pair</summary><label>Pair</label><select id="p-sku">'+skuOpts+'</select><label>Pairs</label><div class="chips">'+qtyChips+'</div><label>Hide</label><div class="hides">'+hideRow+'</div>'+extrasHtml(l.extras,l.look||(p&&p.look)||"","p")+'<label>Collect or send</label><div class="chips">'+delChips+"</div></details>"+
-    '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(l.nextAction||"")+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
+    '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(nextStepLabel(l))+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
 }
 function viewInvoice(){
   const l=S.leads.find(x=>x.id===personId);

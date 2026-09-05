@@ -2,6 +2,7 @@ function draw(){
   const root=document.getElementById("root");
   if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
   runIdleAutoAssign();
+  if(typeof healUnpaidCloseCopy==="function"&&healUnpaidCloseCopy()) save();
   root.innerHTML=Desk();
   hookDesk();
   toast="";
@@ -48,6 +49,7 @@ function patchLead(id,fields){
   const prev=S.leads[i];
   const sitAt=fields.sitAt!=null?fields.sitAt:(prev.sitAt||prev.updatedAt||prev.createdAt);
   const next=Object.assign({},prev,fields,{updatedAt:Date.now(),sitAt});
+  if(staleCloseCopy(next)) next.nextAction=honestNextAction(next);
   S.leads[i]=next;
   save();
   try{
@@ -467,7 +469,11 @@ function hookDesk(){
     if(name&&name.length<2){toast="Need a name.";draw();return}
     if(phone&&digits(phone).length<9){toast="WhatsApp number.";draw();return}
     if(personId){
+      const l=S.leads.find(x=>x.id===personId);
       const fields={nextAction:next,nextActionAt:at,note};
+      if(l&&staleCloseCopy(Object.assign({},l,{nextAction:next}))){
+        fields.nextAction=honestNextAction(Object.assign({},l,{nextAction:next}));
+      }
       if(name) fields.name=name;
       if(phone) fields.phone=phone;
       const pprice=document.getElementById("p-price");

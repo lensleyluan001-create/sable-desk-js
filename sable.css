@@ -941,8 +941,10 @@
       pointer-events: none;
     }
     .wa-miss { margin: 4px 0 0; width: 100%; }
-    .m-wait-row { border-top: 1px solid var(--line); padding-bottom: 8px; }
-    .m-wait-row .m-wait { border-top: 0; }
+    .m-wait-row { border-top: 1px solid var(--line); padding: 8px 0 12px; }
+    .m-wait-row .m-wait { border-top: 0; padding-bottom: 8px; }
+    .m-wait-row .row { margin-top: 4px; flex-wrap: wrap; }
+    .m-wait-row .owner-chip { margin-left: 6px; }
     .actions .wa-sheet { margin-top: 10px; }
     @media (max-width: 879px) {
       .money-split { grid-template-columns: 1fr; }

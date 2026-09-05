@@ -126,7 +126,7 @@ function viewMoney(rows){
       mBlock("Pairs sold",String(m.paidPairs),"Paid on this book")+
       mBlock("This month",String(m.thisPairs),zar(m.thisPaid)+" in · "+mom)+
       mBlock("Cash in",zar(m.paidRand),m.paidTickets+" paid")+
-      mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" invoice"+(m.invOpen===1?"":"s")+" out"):"None waiting",m.eftDue?" warn":"")+
+      mBlock("EFT waiting",zar(m.eftDue),m.invOpen?(m.invOpen+" waiting"):"None waiting",m.eftDue?" warn":"")+
       mBlock("Pair profit",zar(m.paidProfit),"On paid · margin "+pct(m.margin))+
       mBlock("Average ticket",zar(Math.round(m.avg)),m.paidTickets+" closed tickets")+
     "</div>"+
@@ -156,16 +156,25 @@ function viewMoney(rows){
     mBlock("Still open",zar(m.openDue),"Listed on the floor · lost "+zar(m.lostRand))+
     "</div>";
   const wait=m.outstanding.length
-    ? m.outstanding.slice(0,8).map(function(o){
+    ? m.outstanding.map(function(o){
         const lead=rows.find(function(x){return x.id===o.id})||{};
+        const book=o.owner&&o.owner!=="floor"?o.owner:bookOf(lead);
+        const who=book&&book!=="floor"?('<span class="owner-chip">'+esc(SL[book]||book)+"</span>"):'<span class="owner-chip">Floor</span>';
         const chase=canChaseDraft(lead);
         return '<div class="m-wait-row">'+
-          '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'"><span>'+esc(o.name||"No name")+' · '+esc(o.sku)+mismatchBadge(lead)+'</span><span>'+zar(o.due)+' · '+sitLabel(o.age)+"</span></button>"+
-          (chase?waPickerHtml(lead,{primary:false,kind:"pay",reason:"Unpaid EFT"}):"")+
+          '<button class="m-wait" type="button" data-go="person" data-id="'+o.id+'">'+
+            '<span>'+esc(o.name||"No name")+" · "+esc(o.sku||"")+mismatchBadge(lead)+" "+who+"</span>"+
+            '<span>'+zar(o.due)+" · "+sitLabel(o.age)+"</span>"+
+          "</button>"+
+          '<div class="row">'+
+            '<button class="chip" type="button" data-go="person" data-id="'+o.id+'">Open</button>'+
+            (chase?waPickerHtml(lead,{primary:false,kind:"pay",reason:"Unpaid EFT"}):"")+
+            '<button class="solid tight" type="button" data-todopaid="'+o.id+'">Confirm paid</button>'+
+          "</div>"+
         "</div>";
       }).join("")
     : '<p class="meta">None waiting.</p>';
-  const out='<div class="m-block span2"><p class="kicker">Invoices out</p>'+wait+"</div>";
+  const out='<div class="m-block span2"><p class="kicker">Waiting on money</p>'+wait+"</div>";
   return head+'<div class="money-dash">'+split+mid+cuts+books+mix+out+"</div>";
 }
 function viewBoard(){
@@ -179,7 +188,7 @@ function viewBoard(){
   function card(l){
     const p=shoe(l.sku);
     const t=ticket(l);
-    const next=l.nextAction||(l.status==="new"?"Send the first WhatsApp":"Open the card");
+    const next=nextStepLabel(l);
     const age=l.updatedAt||l.createdAt;
     const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
     const book=bookOf(l);

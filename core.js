@@ -508,10 +508,18 @@ function tallyMoney(rows){
     accruedProfit+=profit;
     if(l.status!=="closed") openDue+=t.due;
     if(!l.paid){
-      if(l.invRef){
+      if(isWaitingOnMoney(l)){
         eftDue+=t.due;
         invOpen++;
-        outstanding.push({id:l.id,name:l.name,sku:l.sku,due:t.due,age:now-(l.updatedAt||l.createdAt||now),owner:owner});
+        outstanding.push({
+          id:l.id,
+          name:l.name,
+          sku:l.sku,
+          due:t.due,
+          age:now-(l.updatedAt||l.createdAt||now),
+          owner:owner,
+          mismatch:!!t.mismatch
+        });
       }
     }else{
       paidRand+=t.due;
@@ -694,16 +702,30 @@ function todoAge(it){
   return '<span class="todo-age '+heat+'" title="'+esc(label)+'">'+sitLabel(ms)+"</span>";
 }
 function nextActionClose(l){
-  return /eft received|close the card/i.test(String(l&&l.nextAction||""));
+  return !!(l&&l.paid&&/eft received|close the card/i.test(String(l.nextAction||"")));
+}
+function isWaitingOnMoney(l){
+  if(!l||l.paid||l.status==="lost") return false;
+  if(l.status==="closed") return true;
+  if(String(l.invRef||"").trim()) return true;
+  const t=nextTodo(l);
+  if(t&&t.kind==="pay") return true;
+  return /invoice|eft|pay/i.test(String(l.nextAction||""));
+}
+function nextStepLabel(l){
+  if(!l) return "Open the card";
+  if(l.status==="lost") return String(l.nextAction||"Lost");
+  const t=nextTodo(l);
+  if(t&&t.step) return t.step;
+  return String(l.nextAction||(l.status==="new"||l.status==="inbox"?"Send the first WhatsApp":"Open the card"));
 }
 function nextTodo(l){
   if(!l||l.status==="lost") return null;
   if(l.status==="closed"&&l.paid) return null;
-  if(nextActionClose(l)) return {kind:"close",step:String(l.nextAction||"EFT received. Close the card."),cta:"Mark closed",done:true,wa:false,lane:"now"};
+  if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
   const now=Date.now();
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
   const waiting=due>now;
-  if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
   if(waiting){
     const why=l.nextAction||(needsSize(l)?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
@@ -716,14 +738,13 @@ function nextTodo(l){
   }
   if(!l.paid){
     const na=String(l.nextAction||"");
-    const sent=/invoice|eft|pay/i.test(na)&&!nextActionClose(l);
+    const sent=/invoice|eft|pay/i.test(na);
     return {kind:"pay",step:sent?"Chase the EFT":"Send the invoice",cta:sent?"Chase EFT":"Send invoice",done:true,wa:true,lane:"now"};
   }
   return {kind:"follow",step:l.nextAction||"Follow up",cta:"WhatsApp",done:true,wa:true,lane:"now"};
 }
 function isPayConfirm(t,l){
   if(!l||l.paid||l.status==="lost") return false;
-  if(nextActionClose(l)) return false;
   if(t&&t.kind==="close") return false;
   if(t&&t.kind==="pay") return true;
   const na=String((t&&t.step)||l.nextAction||"");
@@ -789,7 +810,6 @@ function canChaseDraft(l){
 }
 function wantsCustomerDraft(l){
   if(!canChaseDraft(l)) return false;
-  if(nextActionClose(l)) return false;
   const t=nextTodo(l);
   if(!t||t.kind==="close"||t.kind==="take") return false;
   return !!(t.wa||t.kind==="pay"||t.kind==="whatsapp"||t.kind==="size"||t.kind==="follow");
@@ -1004,7 +1024,7 @@ function todoCta(it){
   }else if(it.kind==="pay"){
     out='<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
       draft+
-      '<button class="ghost" type="button" data-todopaid="'+l.id+'">They paid</button>'+todoPendBtn(l,it);
+      '<button class="ghost" type="button" data-todopaid="'+l.id+'">Confirm paid</button>'+todoPendBtn(l,it);
   }else{
     out=(draft||'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>')+todoPendBtn(l,it);
   }
@@ -1246,11 +1266,10 @@ function standupOverdue(){
 function standupUnpaid(){
   const out=[];
   standupRows().forEach(function(l){
-    if(!l||l.paid||isDeadLead(l)||nextActionClose(l)) return;
+    if(!isWaitingOnMoney(l)) return;
     const t=nextTodo(l);
-    if(!(l.invRef||isPayConfirm(t,l))) return;
-    if(sitMs(l)<3600000) return;
-    const why=l.invRef?"Invoice out · unpaid over 1 hour":(todoVerb(t)||"Chase the EFT");
+    const wait=sitMs(l);
+    const why=wait>3600000?"Unpaid EFT over 1 hour":(todoVerb(t)||"Waiting on money");
     out.push(standupPack(l,why));
   });
   out.sort(standupSort);

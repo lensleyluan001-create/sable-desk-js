@@ -275,7 +275,7 @@ function hookDesk(){
     patchLead(personId,{
       paid:on,
       status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
-      nextAction:on?"EFT received. Close the card.":(l&&l.nextAction)||"Chase the EFT",
+      nextAction:on?"EFT received. Close the card.":"Chase the EFT",
       nextActionAt:on?null:l&&l.nextActionAt
     });
     toast=on?"Marked paid.":"Paid undone.";

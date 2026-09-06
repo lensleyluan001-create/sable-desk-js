@@ -57,17 +57,16 @@ function hookGate(){
   if(reset) reset.onsubmit=function(e){
     e.preventDefault();
     const f=Object.fromEntries(new FormData(reset));
-    if(!isHouse(f.email)){toast="Reset is house only. Use the house email.";draw();return}
-    if(String(f.password||"").trim().length<8){toast="Eight characters or more.";draw();return}
-    const u=house();u.password=String(f.password).trim();enter(u);
+    const err=setPhonePass(f.email,f.password);
+    if(err){toast=err;draw()}
   };
   const ask=document.getElementById("ask");
   if(ask) ask.onsubmit=function(e){
     e.preventDefault();
     const f=Object.fromEntries(new FormData(ask));
-    if(isHouse(f.email)){const u=house();if(f.password)u.password=String(f.password).trim();enter(u);return}
+    if(isHouse(f.email)||isHouse(f.name)){toast="House uses Set password on Log in.";mode="in";draw();return}
     const existing=findStaff(f.email)||findStaff(f.name);
-    if(existing){enter(existing);return}
+    if(existing){toast="Already on Sable. Log in.";mode="in";draw();return}
     S.requests=S.requests||[];
     S.requests.push({name:String(f.name||"").trim(),email:String(f.email||"").trim(),password:String(f.password||""),seller:f.seller||"luan",status:"pending",at:Date.now()});
     save();
@@ -671,7 +670,7 @@ function hookDesk(){
       let u=staffUser(seller);
       if(!u){
         u={name:SL[seller]||seller,seller:seller,x:seller,role:seller==="luan"?"admin":"sales",status:"approved",phone:phone};
-        if(seller==="luan"){u.email=LUAN.email;u.password=LUAN.password}
+        if(seller==="luan"){u.email=LUAN.email}
         S.users.push(u);
       }else u.phone=phone;
       save();

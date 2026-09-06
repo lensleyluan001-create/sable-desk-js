@@ -1,10 +1,11 @@
 const KEY="sable-crm-v4";
 const PROOF_KEY="sable-crm-v4-proofs";
 const API="/api/lead";
-const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
-const DYLAN={name:"Dylan",email:"dylan.do80@gmail.com",x:"dylan",password:"SableCRM4181",role:"sales",seller:"dylan",status:"approved"};
-const WIAN={name:"Wian",email:"wian",x:"wian",password:"SableCRM4181",role:"sales",seller:"wian",status:"approved"};
+const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",role:"admin",seller:"luan",status:"approved"};
+const DYLAN={name:"Dylan",email:"dylan.do80@gmail.com",x:"dylan",role:"sales",seller:"dylan",status:"approved"};
+const WIAN={name:"Wian",email:"wian",x:"wian",role:"sales",seller:"wian",status:"approved"};
 const STAFF_SEED=[LUAN,DYLAN,WIAN];
+const PASS_REV=2;
 function esc(s){
   const amp=String.fromCharCode(38)+"amp;";
   const lt=String.fromCharCode(38)+"lt;";
@@ -17,14 +18,14 @@ function samePass(a,b){return String(a||"").trim().toLowerCase()===String(b||"")
 function isHouse(id){const q=norm(id);return !q||q===LUAN.email||q===LUAN.x||q==="luan"||q==="luan lensley"||q==="lensleyluan001"||q.indexOf("lensleyluan001")===0}
 function isSableKey(pass){
   const p=String(pass||"").trim();
-  if(!p) return false;
-  if(p==="4181") return true;
-  if(samePass(p,LUAN.password)) return true;
+  if(p.length<8) return false;
   try{
-    const u=(typeof S!=="undefined"&&S.users||[]).find(function(x){return norm(x.email)===LUAN.email});
-    if(u&&u.password&&samePass(p,u.password)) return true;
-  }catch(e){}
-  return false;
+    const u=house();
+    return !!(u&&u.password&&samePass(p,u.password));
+  }catch(e){return false}
+}
+function needsLocalPass(){
+  return !(S.users||[]).some(function(u){return u&&String(u.password||"").trim().length>=8});
 }
 function findStaff(id){
   const q=norm(id);
@@ -46,20 +47,39 @@ function seedStaff(list){
     out[i].email=out[i].email||st.email;
     out[i].x=st.x;
     out[i].seller=st.seller;
-    if(!out[i].password) out[i].password=st.password;
   });
   return out;
+}
+function setPhonePass(id,pass){
+  id=String(id||"").trim();
+  pass=String(pass||"").trim();
+  if(pass.length<8) return "Eight characters or more.";
+  let user=findStaff(id);
+  if(!user&&!id) user=house();
+  if(!user) return "Use Luan, Dylan or Wian.";
+  user.password=pass;
+  user.status="approved";
+  const i=(S.users||[]).findIndex(function(u){return u&&norm(u.email)===norm(user.email)});
+  if(i<0) S.users.push(user);
+  else S.users[i].password=pass;
+  enter(user);
+  return "";
 }
 function tryLogin(id,pass){
   id=String(id||"").trim();
   pass=String(pass||"").trim();
-  if(!pass&&isSableKey(id)){pass=id;id=""}
-  if(!pass) return "Type the Sable key.";
+  if(!pass) return "Type a password.";
+  if(needsLocalPass()) return "Set a password on this phone first.";
   const user=findStaff(id);
-  const key=isSableKey(pass);
-  if(user&&(key||samePass(pass,user.password))){enter(user);return ""}
-  if(key||(isHouse(id)&&(samePass(pass,LUAN.password)||pass==="4181"))){enter(house());return ""}
-  return "Wrong login. Type the Sable key. Name can stay blank.";
+  if(user&&user.password&&samePass(pass,user.password)){enter(user);return ""}
+  if(!id){
+    const hits=(S.users||[]).filter(function(u){
+      return u&&(!u.status||u.status==="approved")&&u.password&&samePass(pass,u.password);
+    });
+    if(hits.length===1){enter(hits[0]);return ""}
+    if(isSableKey(pass)){enter(house());return ""}
+  }
+  return "Wrong login. Forgot password sets a new one on this phone.";
 }
 function dropSession(){
   if(typeof S!=="undefined") S.session=null;
@@ -355,7 +375,12 @@ function load(){
     s.users[i].email=LUAN.email;
     s.users[i].x=LUAN.x;
     s.users[i].seller=s.users[i].seller||"luan";
-    if(!s.users[i].password)s.users[i].password=LUAN.password;
+  }
+  if(s.passRev!==PASS_REV){
+    s.users.forEach(function(u){if(u) u.password="";});
+    s.passRev=PASS_REV;
+    s.session=null;
+    try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}
   }
   return s;
 }
@@ -885,15 +910,18 @@ function trackPublic(l){
   };
 }
 function Gate(){
+  const first=needsLocalPass()&&mode!=="ask";
+  const showReset=mode==="reset"||first;
   let form="";
-  if(mode==="reset") form='<form class="card" id="reset"><label>Email</label><input name="email" placeholder="House email" autocomplete="username" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. House key still works after you set one.</p>';
+  if(showReset) form='<form class="card" id="reset"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Eight characters or more" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. Each person sets their own.</p>';
   else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><button class="solid" type="submit">Send request</button></form>';
-  else form='<form class="card" id="signin"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>Sable key</label><input name="password" type="password" autocomplete="current-password" placeholder="Sable key" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
-  const title=mode==="reset"?"New password":mode==="ask"?"Request Sable":"Log in";
-  const back=mode==="in"
+  else form='<form class="card" id="signin"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>Password</label><input name="password" type="password" autocomplete="current-password" placeholder="Password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
+  const title=showReset?"Set a password":mode==="ask"?"Request Sable":"Log in";
+  const sub=showReset?"This phone only. Eight characters or more. Name can stay blank.":"Staff only. Password lives on this phone. Name can stay blank.";
+  const back=mode==="in"||first
     ? '<a class="go-back" href="/want">Collection</a>'
     : '<button class="go-back" type="button" id="back-gate">Back</button>';
-  return back+'<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Same Sable key on every phone. Name can stay blank.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
+  return back+'<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">'+sub+'</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"||first?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
 }
 function navBtns(){
   const items=[["desk","Desk","D"],["todo","To-do","T"],["board","Board","B"],["capture","Capture","C"],["clients","Clients","L"],["meetings","Meetings","M"]];

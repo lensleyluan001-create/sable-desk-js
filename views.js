@@ -301,6 +301,8 @@ function viewPerson(){
     :'<button class="'+(proofOn?"chip on":"chip")+'" type="button" data-paid="1">Mark paid</button>';
   const rejectBtn=(!l.paid&&proofOn)?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"";
   const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+invoiceActionPair(l)+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const payLine='<p class="ticket-pay"><span'+(l.paid?' class="ok"':'')+'>Paid '+(l.paid?"Yes":"No")+"</span><span> · "+esc(payStateLabel(payState(l)))+"</span></p>";
+  const stick='<div class="ticket-stick">'+payLine+waRow+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);
@@ -309,7 +311,7 @@ function viewPerson(){
     return '<div class="order-line">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div></div>')+'<div><p class="name">'+esc(it.sku)+" · "+esc(it.look)+(it.extras&&it.extras.custom?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p><div class="chips">'+chips+"</div></div></div>";
   }).join("")+"</div>":"";
   return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="desk">Desk</button><button class="ghost" type="button" data-tab="todo">To-do</button><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(t.qty>1?" · "+t.qty+" pairs":"")+(ago?" · last "+ago:"")+"</p>"+
-    waRow+
+    stick+
     (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+(t.items.length>1?" · first of "+t.qty:"")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
     orderLines+
     sizeBlock+

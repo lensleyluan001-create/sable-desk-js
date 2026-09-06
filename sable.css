@@ -628,6 +628,9 @@
     .flash-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 16px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 18px; }
     .actions .chip, .actions a.chip { min-height: 44px; }
+    .ticket-pay { margin: 0; font-size: 13px; color: var(--muted); }
+    .ticket-pay .ok { color: var(--good); font-weight: 600; }
+    .ticket-stick { margin: 0 0 14px; }
     details.more { margin-top: 8px; }
     details.more summary {
       cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center;
@@ -986,6 +989,19 @@
     .actions .wa-sheet { margin-top: 10px; }
     @media (max-width: 879px) {
       .money-split { grid-template-columns: 1fr; }
+      .ticket-stick {
+        position: sticky;
+        top: calc(48px + env(safe-area-inset-top, 0px));
+        z-index: 15;
+        margin: 0 -18px 12px;
+        padding: 8px 18px 10px;
+        background: color-mix(in srgb, var(--paper) 94%, transparent);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--line);
+      }
+      .ticket-stick .actions { margin: 6px 0 0; }
+      .ticket-stick .wa-sheet { max-height: 40vh; overflow-y: auto; }
     }
     @media (max-width: 640px) {
       .todo-line { padding: 12px 14px; }

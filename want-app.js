@@ -1,3 +1,4 @@
+try{if(typeof sableSentry==="function")sableSentry("want")}catch(e){}
     const HOUSE_MAIL = "lensleyluan001@gmail.com";
     const BAG_KEY = "sable-want-bag-v1";
     function zar(n){ if(n==null||n==="") return "POA"; return "R"+Number(n).toLocaleString("en-ZA"); }

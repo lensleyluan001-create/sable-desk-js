@@ -1,3 +1,4 @@
+try{if(typeof sableSentry==="function")sableSentry("track")}catch(e){}
 (function () {
   const PHOTO = "https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/main/views/";
   const root = document.getElementById("track");

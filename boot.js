@@ -1,3 +1,4 @@
+try{if(typeof sableSentry==="function")sableSentry("staff")}catch(e){}
 function showRoot(){
   const root=document.getElementById("root");
   if(root) root.classList.add("is-on");

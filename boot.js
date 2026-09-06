@@ -1,33 +1,63 @@
+function showRoot(){
+  const root=document.getElementById("root");
+  if(root) root.classList.add("is-on");
+  document.body.classList.add("js-on");
+  if(S.session) document.body.classList.add("has-desk");
+  else document.body.classList.remove("has-desk");
+  const door=document.getElementById("door");
+  if(door) door.hidden=true;
+}
 function draw(){
   const root=document.getElementById("root");
-  if(!S.session){root.innerHTML=Gate();hookGate();toast="";return}
-  runIdleAutoAssign();
-  if(typeof healUnpaidCloseCopy==="function"&&healUnpaidCloseCopy()) save();
-  root.innerHTML=Desk();
-  hookDesk();
-  toast="";
+  if(!root) return;
+  try{
+    if(!S.session){
+      root.innerHTML=Gate();
+      try{hookGate()}catch(e){}
+      toast="";
+      showRoot();
+      return;
+    }
+    try{runIdleAutoAssign()}catch(e){}
+    try{if(typeof healUnpaidCloseCopy==="function"&&healUnpaidCloseCopy()) save()}catch(e){}
+    root.innerHTML=Desk();
+    try{hookDesk()}catch(e){}
+    toast="";
+    showRoot();
+  }catch(err){
+    toast="";
+    try{
+      if(!S.session){
+        root.innerHTML=Gate();
+        hookGate();
+      }else{
+        root.innerHTML='<div class="gate"><div class="brand">SABLE CRM</div><h1>You are in</h1><p class="sub">The desk hit a snag. Reload. Sign out if you need the door.</p><button class="solid" type="button" id="desk-reload">Reload desk</button><button class="ghost" type="button" id="out">Sign out</button></div>';
+        const rl=document.getElementById("desk-reload");
+        if(rl) rl.onclick=function(){location.reload()};
+        const out=document.getElementById("out");
+        if(out) out.onclick=dropSession;
+      }
+    }catch(e){}
+    showRoot();
+  }
 }
 function hookGate(){
   const mi=document.getElementById("m-in"); if(mi) mi.onclick=function(){mode="in";toast="";draw()};
   const ma=document.getElementById("m-ask"); if(ma) ma.onclick=function(){mode="ask";toast="";draw()};
   const fg=document.getElementById("forgot"); if(fg) fg.onclick=function(){mode="reset";toast="";draw()};
+  const bg=document.getElementById("back-gate"); if(bg) bg.onclick=function(){mode="in";toast="";draw()};
   const signin=document.getElementById("signin");
   if(signin) signin.onsubmit=function(e){
     e.preventDefault();
     const f=Object.fromEntries(new FormData(signin));
-    const pass=String(f.password||"");
-    if(isHouse(f.email)&&(samePass(pass,LUAN.password)||String(pass).trim()==="4181")){enter(house());return}
-    const q=norm(f.email);
-    const user=S.users.find(u=>u.status==="approved"&&(norm(u.email)===q||norm(u.x)===q));
-    if(user&&samePass(pass,user.password)){enter(user);return}
-    toast=isHouse(f.email)?"House key is SableCRM4181. Caps do not matter. Or use Forgot password.":"Wrong login. House email is lensleyluan001@gmail.com. Or Request login.";
-    draw();
+    const err=tryLogin(f.email,f.password);
+    if(err){toast=err;draw()}
   };
   const reset=document.getElementById("reset");
   if(reset) reset.onsubmit=function(e){
     e.preventDefault();
     const f=Object.fromEntries(new FormData(reset));
-    if(!isHouse(f.email)){toast="Type lensleyluan001@gmail.com — reset is house only.";draw();return}
+    if(!isHouse(f.email)){toast="Reset is house only. Use the house email.";draw();return}
     if(String(f.password||"").trim().length<8){toast="Eight characters or more.";draw();return}
     const u=house();u.password=String(f.password).trim();enter(u);
   };
@@ -36,10 +66,12 @@ function hookGate(){
     e.preventDefault();
     const f=Object.fromEntries(new FormData(ask));
     if(isHouse(f.email)){const u=house();if(f.password)u.password=String(f.password).trim();enter(u);return}
+    const existing=findStaff(f.email)||findStaff(f.name);
+    if(existing){enter(existing);return}
     S.requests=S.requests||[];
     S.requests.push({name:String(f.name||"").trim(),email:String(f.email||"").trim(),password:String(f.password||""),seller:f.seller||"luan",status:"pending",at:Date.now()});
     save();
-    toast="Request saved on this phone. Open Luan admin on Sable to approve.";
+    toast="Request saved on this phone. Open house admin on Sable to approve.";
     mode="in";draw();
   };
 }
@@ -162,8 +194,8 @@ function scoopCap(){
   }
 }
 function hookDesk(){
-  const out=document.getElementById("out"); if(out) out.onclick=function(){S.session=null;save();draw()};
-  const out2=document.getElementById("out2"); if(out2) out2.onclick=function(){S.session=null;save();draw()};
+  const out=document.getElementById("out"); if(out) out.onclick=dropSession;
+  const out2=document.getElementById("out2"); if(out2) out2.onclick=dropSession;
   const copyWant=document.getElementById("copy-want");
   if(copyWant) copyWant.onclick=function(){
     const u=clientWebUrl();

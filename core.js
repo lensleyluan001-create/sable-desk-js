@@ -2,6 +2,9 @@ const KEY="sable-crm-v4";
 const PROOF_KEY="sable-crm-v4-proofs";
 const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",password:"SableCRM4181",role:"admin",seller:"luan",status:"approved"};
+const DYLAN={name:"Dylan",email:"dylan.do80@gmail.com",x:"dylan",password:"SableCRM4181",role:"sales",seller:"dylan",status:"approved"};
+const WIAN={name:"Wian",email:"wian",x:"wian",password:"SableCRM4181",role:"sales",seller:"wian",status:"approved"};
+const STAFF_SEED=[LUAN,DYLAN,WIAN];
 function esc(s){
   const amp=String.fromCharCode(38)+"amp;";
   const lt=String.fromCharCode(38)+"lt;";
@@ -12,6 +15,57 @@ function esc(s){
 function norm(s){return String(s||"").trim().toLowerCase().replace(/^@/,"")}
 function samePass(a,b){return String(a||"").trim().toLowerCase()===String(b||"").trim().toLowerCase()}
 function isHouse(id){const q=norm(id);return !q||q===LUAN.email||q===LUAN.x||q==="luan"||q==="luan lensley"||q==="lensleyluan001"||q.indexOf("lensleyluan001")===0}
+function isSableKey(pass){
+  const p=String(pass||"").trim();
+  if(!p) return false;
+  if(p==="4181") return true;
+  if(samePass(p,LUAN.password)) return true;
+  try{
+    const u=(typeof S!=="undefined"&&S.users||[]).find(function(x){return norm(x.email)===LUAN.email});
+    if(u&&u.password&&samePass(p,u.password)) return true;
+  }catch(e){}
+  return false;
+}
+function findStaff(id){
+  const q=norm(id);
+  if(!q) return null;
+  return ((typeof S!=="undefined"&&S.users)||[]).find(function(u){
+    if(!u) return false;
+    if(u.status&&u.status!=="approved") return false;
+    return norm(u.email)===q||norm(u.x)===q||norm(u.seller)===q||norm(u.name)===q||norm((u.name||"").split(" ")[0])===q;
+  })||null;
+}
+function seedStaff(list){
+  const out=Array.isArray(list)?list.slice():[];
+  STAFF_SEED.forEach(function(st){
+    const i=out.findIndex(function(u){return norm(u.email)===norm(st.email)||norm(u.seller)===norm(st.seller)});
+    if(i<0){out.push(Object.assign({},st));return}
+    out[i].status="approved";
+    out[i].role=st.role;
+    out[i].name=out[i].name||st.name;
+    out[i].email=out[i].email||st.email;
+    out[i].x=st.x;
+    out[i].seller=st.seller;
+    if(!out[i].password) out[i].password=st.password;
+  });
+  return out;
+}
+function tryLogin(id,pass){
+  id=String(id||"").trim();
+  pass=String(pass||"").trim();
+  if(!pass&&isSableKey(id)){pass=id;id=""}
+  if(!pass) return "Type the Sable key.";
+  const user=findStaff(id);
+  const key=isSableKey(pass);
+  if(user&&(key||samePass(pass,user.password))){enter(user);return ""}
+  if(key||(isHouse(id)&&(samePass(pass,LUAN.password)||pass==="4181"))){enter(house());return ""}
+  return "Wrong login. Type the Sable key. Name can stay blank.";
+}
+function dropSession(){
+  if(typeof S!=="undefined") S.session=null;
+  try{save()}catch(e){}
+  try{location.replace("/login")}catch(e){try{draw()}catch(err){}}
+}
 function uid(){return "ld-"+Math.random().toString(36).slice(2,10)}
 function zar(n){if(n==null||n==="")return "POA";return "R"+Number(n).toLocaleString("en-ZA")}
 function digits(p){return String(p||"").replace(/\D/g,"")}
@@ -291,6 +345,7 @@ function load(){
   }catch(e){}
   s.leads=keepLeads(s.leads.concat(extra)).map(leadFix);
   s.leads=hydrateProofs(s.leads);
+  s.users=seedStaff(s.users);
   const i=s.users.findIndex(u=>norm(u.email)===LUAN.email);
   if(i<0)s.users.unshift(Object.assign({},LUAN));
   else{
@@ -815,11 +870,14 @@ function trackPublic(l){
 }
 function Gate(){
   let form="";
-  if(mode==="reset") form='<form class="card" id="reset"><label>Email</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. House key still works after you set one.</p>';
-  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><label>Who</label><select name="seller"><option value="wian">Wian</option><option value="luan">Luan</option><option value="dylan">Dylan</option></select><button class="solid" type="submit">Send request</button></form>';
-  else form='<form class="card" id="signin"><label>Email or X handle</label><input name="email" value="'+esc(LUAN.email)+'" autocomplete="username" required /><label>Password</label><input name="password" type="password" required autocomplete="current-password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
+  if(mode==="reset") form='<form class="card" id="reset"><label>Email</label><input name="email" placeholder="House email" autocomplete="username" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. House key still works after you set one.</p>';
+  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><button class="solid" type="submit">Send request</button></form>';
+  else form='<form class="card" id="signin"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>Sable key</label><input name="password" type="password" autocomplete="current-password" placeholder="Sable key" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
   const title=mode==="reset"?"New password":mode==="ask"?"Request Sable":"Log in";
-  return '<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Luan email is filled in.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
+  const back=mode==="in"
+    ? '<a class="go-back" href="/want">Collection</a>'
+    : '<button class="go-back" type="button" id="back-gate">Back</button>';
+  return back+'<div class="gate"><div class="brand">SABLE CRM</div><h1>'+title+'</h1><p class="sub">Staff only. Same Sable key on every phone. Name can stay blank.</p><div class="row" style="margin-bottom:12px"><button class="chip '+(mode==="in"?"on":"")+'" type="button" id="m-in">Log in</button><button class="chip '+(mode==="ask"?"on":"")+'" type="button" id="m-ask">Request login</button></div>'+form+(toast?'<p class="err">'+esc(toast)+"</p>":"")+'<p class="sub" style="margin-top:22px">Looking for the pairs? <a class="client-link" href="/want">Open the collection</a></p></div>';
 }
 function navBtns(){
   const items=[["desk","Desk","D"],["todo","To-do","T"],["board","Board","B"],["capture","Capture","C"],["clients","Clients","L"],["meetings","Meetings","M"]];

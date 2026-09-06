@@ -331,7 +331,13 @@ function hookDesk(){
     S.meetings.unshift({id:uid(),title:String(f.title||"").trim(),withName:String(f.withName||"").trim(),at:f.at?new Date(f.at).toISOString():new Date().toISOString(),note:String(f.note||"").trim()});
     save();draw();
   };
-  document.querySelectorAll("[data-delmeet]").forEach(b=>b.onclick=function(){S.meetings=S.meetings.filter(m=>m.id!==b.getAttribute("data-delmeet"));save();draw()});
+  document.querySelectorAll("[data-delmeet]").forEach(b=>b.onclick=function(){
+    const id=b.getAttribute("data-delmeet");
+    S.meetings=S.meetings.filter(m=>m.id!==id);
+    save();
+    try{fetch(API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({deleteMeeting:id})}).catch(function(){})}catch(e){}
+    draw();
+  });
   document.querySelectorAll("[data-stage]").forEach(b=>b.onclick=function(){
     if(!personId) return;
     const st=b.getAttribute("data-stage");
@@ -714,7 +720,8 @@ function hookDesk(){
       accountName:String(f.accountName||"").trim(),
       accountNumber:String(f.accountNumber||"").trim(),
       branch:String(f.branch||"").trim(),
-      type:String(f.type||"Cheque").trim()
+      type:String(f.type||"Cheque").trim(),
+      updatedAt:Date.now()
     });
     save();
     toast="Saved on invoices.";
@@ -726,6 +733,28 @@ async function ingest(){
     const r=await fetch(API);
     if(!r.ok) return;
     const j=await r.json();
+    if(j&&j.cloud){
+      const known={};
+      (S.leads||[]).forEach(function(l){if(l&&l.id) known[l.id]=true});
+      applyBook(j);
+      const fresh=(j.leads||[]).filter(function(l){
+        return l&&l.id&&!known[l.id]&&isWebApp(l)&&(l.status==="new"||l.status==="inbox");
+      });
+      if(!j.imported&&!S.importedAt&&((S.leads||[]).length||(S.meetings||[]).length)){
+        S.importedAt=Date.now();
+        pulling=true;try{saveLocal()}finally{pulling=false}
+        fetch(API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({import:true,leads:S.leads,meetings:S.meetings||[],bank:S.bank||{}})}).catch(function(){});
+      }
+      if(fresh.length&&S.session){
+        if(houseView()){
+          const row=fresh[0];
+          toast="New Want lead — "+(row.name||"Client")+" · "+(row.sku||"");
+          if(fresh.length>1) toast+=" + "+(fresh.length-1);
+        }
+        draw();
+      }else if(S.session&&tab==="todo"&&!personId) draw();
+      return;
+    }
     const before=S.leads.length;
     const merged=mergeWantIngest(j.leads||[],S.leads);
     S.leads=merged.rows;

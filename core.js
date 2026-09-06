@@ -302,7 +302,7 @@ function leadFix(l){
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
   };
 }
-function emptyBank(){return {bank:"",accountName:"",accountNumber:"",branch:"",type:"Cheque"}}
+function emptyBank(){return {bank:"",accountName:"",accountNumber:"",branch:"",type:"Cheque",updatedAt:0}}
 function keepLeads(list){
   const byId=new Map();
   for(const raw of list||[]){
@@ -385,15 +385,22 @@ function load(){
   return s;
 }
 let vaultTimer=0;
+let pulling=false;
 function vaultPush(){
   try{
+    if(pulling) return;
     clearTimeout(vaultTimer);
     vaultTimer=setTimeout(function(){
-      fetch(API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({leads:S.leads})}).catch(function(){});
+      const slim=(S.leads||[]).map(function(l){
+        if(!l) return l;
+        if(String(l.proofUrl||"").indexOf("data:")===0) return Object.assign({},l,{proofUrl:l.id?"proof:"+l.id:""});
+        return l;
+      });
+      fetch(API,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({leads:slim,meetings:S.meetings||[],bank:S.bank||{}})}).catch(function(){});
     },400);
   }catch(e){}
 }
-function save(){
+function saveLocal(){
   let stored=[];
   try{
     const prev=JSON.parse(localStorage.getItem(KEY)||"null");
@@ -414,7 +421,30 @@ function save(){
     try{localStorage.setItem(KEY,JSON.stringify(Object.assign({},pack,{leads:slim.map(function(l){return Object.assign({},l,{proofUrl:""})})})))}catch(err){}
   }
   try{localStorage.setItem(KEY+"-leads",JSON.stringify(slim))}catch(e){}
+}
+function save(){
+  saveLocal();
   vaultPush();
+}
+function applyBook(j){
+  if(!j||typeof j!=="object") return;
+  pulling=true;
+  try{
+    if(Array.isArray(j.leads)) S.leads=keepLeads((j.leads||[]).concat(S.leads||[])).map(leadFix);
+    if(Array.isArray(j.meetings)){
+      const m={};
+      (S.meetings||[]).forEach(function(x){if(x&&x.id) m[x.id]=x});
+      (j.meetings||[]).forEach(function(x){if(x&&x.id) m[x.id]=x});
+      S.meetings=Object.keys(m).map(function(k){return m[k]});
+    }
+    if(j.bank&&typeof j.bank==="object"){
+      const remoteAt=Number(j.bank.updatedAt||0);
+      const localAt=Number((S.bank&&S.bank.updatedAt)||0);
+      const remoteHas=!!String(j.bank.accountName||"").trim()||!!String(j.bank.accountNumber||"").trim()||!!String(j.bank.bank||"").trim();
+      if(remoteHas&&(remoteAt>=localAt||!String((S.bank&&S.bank.accountNumber)||"").trim())) S.bank=Object.assign(emptyBank(),j.bank);
+    }
+    saveLocal();
+  }finally{pulling=false}
 }
 let S=load();
 let mode="in";

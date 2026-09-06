@@ -707,7 +707,23 @@ function invRef(l){
   return "SBL-"+tail+"-"+short;
 }
 function bankOf(){return Object.assign(emptyBank(),S.bank||{})}
-function bankReady(){const b=bankOf();return !!(b.accountName&&b.accountNumber)}
+function bankReady(){const b=bankOf();return !!(String(b.accountName||"").trim()&&String(b.accountNumber||"").trim())}
+function bankSetupBtn(cls){
+  return '<button class="'+(cls||"chip")+'" type="button" data-tab="team">Invoice setup incomplete — Team</button>';
+}
+function invoiceBtn(l,cls){
+  if(!bankReady()) return bankSetupBtn(cls);
+  if(!l||!l.id) return "";
+  return '<button class="'+(cls||"chip on")+'" type="button" data-invoice="'+l.id+'">Invoice</button>';
+}
+function copyEftBtn(cls){
+  if(!bankReady()) return bankSetupBtn(cls);
+  return '<button class="'+(cls||"chip")+'" type="button" data-copy="eft">Copy EFT</button>';
+}
+function invoiceActionPair(l){
+  if(!bankReady()) return bankSetupBtn();
+  return invoiceBtn(l)+copyEftBtn();
+}
 function bankLines(){
   const b=bankOf();
   const lines=[];
@@ -1318,7 +1334,7 @@ function todoCta(it){
     const sizes='<div class="todo-sizes"><p class="kicker">They replied · lock UK</p><div class="chips">'+UK.map(s=>'<button class="chip" type="button" data-lead="'+l.id+'" data-locksize="'+s+'">'+s+"</button>").join("")+"</div></div>";
     out=draft+sizes+todoPendBtn(l,it);
   }else if(it.kind==="pay"){
-    out='<button class="solid tight" type="button" data-invoice="'+l.id+'">Invoice</button>'+
+    out=invoiceBtn(l,"solid tight")+
       draft+
       proofDropHtml(l)+
       '<button class="ghost" type="button" data-todopaid="'+l.id+'">Confirm paid</button>'+todoPendBtn(l,it);

@@ -215,6 +215,11 @@ function hookDesk(){
     tab=go==="person"?"clients":go;personId=null;draw();
   });
   document.querySelectorAll("[data-invoice]").forEach(b=>b.onclick=function(){
+    if(!bankReady()){
+      toast="Invoice setup incomplete — Team";
+      tab="team";personId=null;invView=false;draw();
+      return;
+    }
     const id=b.getAttribute("data-invoice");
     const l=S.leads.find(x=>x.id===id);
     if(!l) return;
@@ -467,6 +472,11 @@ function hookDesk(){
     }
   });
   document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=function(){
+    if(!bankReady()){
+      toast="Invoice setup incomplete — Team";
+      tab="team";personId=null;invView=false;draw();
+      return;
+    }
     if(!personId) return;
     const l=S.leads.find(x=>x.id===personId);
     if(!l) return;

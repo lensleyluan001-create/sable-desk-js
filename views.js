@@ -264,7 +264,8 @@ function viewMeetings(){
 function viewTeam(){
   const pending=S.requests.filter(r=>r.status!=="approved"&&r.status!=="denied");
   const b=bankOf();
-  const bank=houseView()?'<h3 style="margin-top:24px">EFT on the invoice</h3><p class="sub">This is what the customer sees. Save it once.</p><form class="card" id="bank"><label>Bank</label><input name="bank" value="'+esc(b.bank)+'" placeholder="Bank name" autocomplete="off" /><label>Account name</label><input name="accountName" value="'+esc(b.accountName)+'" placeholder="Sable" autocomplete="off" /><label>Account number</label><input name="accountNumber" value="'+esc(b.accountNumber)+'" inputmode="numeric" autocomplete="off" /><label>Branch</label><input name="branch" value="'+esc(b.branch)+'" autocomplete="off" /><label>Account type</label><input name="type" value="'+esc(b.type||"Cheque")+'" autocomplete="off" /><button class="solid" type="submit">Save on invoices</button></form>':"";
+  const warn=!bankReady()?'<p class="err">Invoice setup incomplete. Save account name and number. Invoice and Copy EFT stay off until this is saved.</p>':"";
+  const bank=houseView()?'<h3 style="margin-top:24px">EFT on the invoice</h3><p class="sub">This is what the customer sees. Save it once. We do not invent bank details.</p><form class="card" id="bank"><label>Bank</label><input name="bank" value="'+esc(b.bank)+'" placeholder="Bank name" autocomplete="off" /><label>Account name</label><input name="accountName" value="'+esc(b.accountName)+'" placeholder="Account name" autocomplete="off" /><label>Account number</label><input name="accountNumber" value="'+esc(b.accountNumber)+'" inputmode="numeric" autocomplete="off" /><label>Branch</label><input name="branch" value="'+esc(b.branch)+'" autocomplete="off" /><label>Account type</label><input name="type" value="'+esc(b.type||"Cheque")+'" autocomplete="off" /><button class="solid" type="submit">Save on invoices</button></form>':"";
   const people=SELLERS.map(function(s){
     const u=staffUser(s);
     const raw=u?(u.phone||u.whatsapp||u.wa||""):"";
@@ -272,7 +273,7 @@ function viewTeam(){
     const email=(u&&u.email)||"";
     return '<form class="card" data-staffphone="'+s+'"><p class="name">'+esc(name)+'</p><p class="meta">'+esc(email)+(email?" · ":"")+esc(SL[s])+'</p><label>WhatsApp</label><input name="phone" value="'+esc(raw)+'" inputmode="tel" placeholder="08 or 27 — type theirs, we do not invent one" autocomplete="off" /><button class="solid" type="submit">Save WhatsApp</button></form>';
   }).join("");
-  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p><h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">Staff WhatsApp</h3><p class="sub">Floor drafts go here. Blank means no number — we will not invent one.</p>'+people+bank;
+  return '<p class="kicker">CRM</p><h1>Team</h1><p class="sub">Requests land here. You verify Sable. Until then they cannot open the floor.</p>'+warn+'<h3>Requests</h3>'+(pending.length?pending.map(r=>'<div class="lead"><p class="name">'+esc(r.name)+'</p><p class="meta">'+esc(r.email)+' · '+(SL[r.seller]||r.seller||"")+'</p><div class="row"><button class="chip on" type="button" data-ok="'+esc(r.email)+'">Approve sales</button><button class="chip" type="button" data-no="'+esc(r.email)+'">Deny</button></div></div>').join(""):'<p class="empty">None waiting.</p>')+'<h3 style="margin-top:24px">Staff WhatsApp</h3><p class="sub">Floor drafts go here. Blank means no number — we will not invent one.</p>'+people+bank;
 }
 function viewPerson(){
   const l=S.leads.find(x=>x.id===personId);
@@ -299,7 +300,7 @@ function viewPerson(){
     ?'<button class="chip good on" type="button" data-paid="0">Paid · undo</button>'
     :'<button class="'+(proofOn?"chip on":"chip")+'" type="button" data-paid="1">Mark paid</button>';
   const rejectBtn=(!l.paid&&proofOn)?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"";
-  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button><button class="chip on" type="button" data-invoice="'+l.id+'">Invoice</button><button class="chip" type="button" data-copy="eft">Copy EFT</button>'+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+invoiceActionPair(l)+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
   const orderLines=t.items.length>1?'<div class="order-lines">'+t.items.map(function(it,i){
     const ip=shoe(it.sku);
@@ -319,6 +320,9 @@ function viewPerson(){
     '<form class="card" id="pnext"><p class="kicker">Keep moving</p><label>What to do next</label><input name="next" value="'+esc(nextStepLabel(l))+'" placeholder="Chase EFT. Lock size." /><label>When</label><input name="at" type="datetime-local" value="'+esc(localAt(l.nextActionAt))+'" /><label>Name</label><input name="name" value="'+esc(l.name)+'" required /><label>WhatsApp</label><input name="phone" value="'+esc(l.phone)+'" required inputmode="tel" /><label>Note</label><textarea name="note" placeholder="Tan hide. Call after 6.">'+esc(l.note)+'</textarea><button class="solid" type="submit">Save</button></form>';
 }
 function viewInvoice(){
+  if(!bankReady()){
+    return '<p class="empty">Invoice setup incomplete.</p>'+bankSetupBtn("chip on")+'<button class="ghost" type="button" data-invback="1">Back</button>';
+  }
   const l=S.leads.find(x=>x.id===personId);
   if(!l) return '<p class="empty">Not on Sable.</p><button class="chip" type="button" data-tab="todo">To-do</button>';
   const t=ticket(l);
@@ -338,7 +342,7 @@ function viewInvoice(){
     '<button class="ghost" type="button" data-invback="1">Back</button>'+
     '<button class="solid tight" type="button" id="inv-print">Print / PDF</button>'+
     (waPay?'<a class="chip on" href="'+waPay+'" target="_blank" rel="noreferrer" data-invsent="'+l.id+'">WhatsApp</a>':'')+
-    '<button class="chip" type="button" data-copy="eft">Copy EFT</button>'+
+    copyEftBtn()+
     '<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+
     (l.paid?'<span class="chip good on">Paid</span>':'<button class="chip" type="button" data-paid="1">Mark paid</button>')+
     (!l.paid?proofDropHtml(l):"")+

@@ -30,7 +30,7 @@
     html, body {
       margin: 0; background: var(--paper); color: var(--ink);
       font-family: var(--font-body); font-weight: 400;
-      overflow-x: hidden;
+      overflow-x: clip;
     }
     button, input, select, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; }
@@ -989,15 +989,33 @@
     .actions .wa-sheet { margin-top: 10px; }
     @media (max-width: 879px) {
       .money-split { grid-template-columns: 1fr; }
+      .shell.is-ticket,
+      .shell.is-ticket .stage {
+        height: 100dvh;
+        max-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .shell.is-ticket .stage { flex: 1; min-height: 0; }
+      .shell.is-ticket .top {
+        position: relative;
+        flex: 0 0 auto;
+      }
+      .shell.is-ticket .work {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
       .ticket-stick {
         position: sticky;
-        top: calc(48px + env(safe-area-inset-top, 0px));
-        z-index: 15;
+        top: 0;
+        z-index: 16;
         margin: 0 -18px 12px;
         padding: 8px 18px 10px;
-        background: color-mix(in srgb, var(--paper) 94%, transparent);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        background: var(--paper);
         border-bottom: 1px solid var(--line);
       }
       .ticket-stick .actions { margin: 6px 0 0; }

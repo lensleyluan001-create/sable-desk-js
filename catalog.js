@@ -1,6 +1,6 @@
 const PHOTO="https://raw.githubusercontent.com/lensleyluan001-create/sable-looks/main/";
-const SELLERS=["wian","luan","dylan"];
-const SL={wian:"Wian",luan:"Luan",dylan:"Dylan"};
+const SELLERS=["wian","luan","dylan","sgm"];
+const SL={wian:"Wian",luan:"Luan",dylan:"Dylan",sgm:"SGM"};
 const UK=["3","4","5","6","7","8","9","10","11","12","13"];
 const HIDES=[["book","As photographed"],["tan","Tan"],["brown","Brown"],["dark","Dark brown"],["black","Black"],["olive","Olive"],["grey","Grey"],["navy","Navy"],["white","White"],["cream","Cream"],["wine","Wine"]];
 const HIDE_SWATCH={book:"#8a7a68",tan:"#c4a574",brown:"#6b4634",dark:"#3a2418",black:"#14110e",olive:"#5a6348",grey:"#8a8880",navy:"#1e3a5f",white:"#f3eee6",cream:"#eadcc4",wine:"#7a1f2b"};
@@ -68,6 +68,7 @@ function matchSeller(name){
   if(q==="wian"||q.indexOf("wian")===0) return "wian";
   if(q==="luan"||q.indexOf("luan")===0) return "luan";
   if(q==="dylan"||q.indexOf("dylan")===0) return "dylan";
+  if(q==="sgm"||q.indexOf("sgm")===0||q==="sablesgm1"||q==="sablesgm1@gmail.com") return "sgm";
   return null;
 }
 function wantDeskLead(opts){

@@ -4,7 +4,8 @@ const API="/api/lead";
 const LUAN={name:"Luan Lensley",email:"lensleyluan001@gmail.com",x:"lensleylua83617",role:"admin",seller:"luan",status:"approved"};
 const DYLAN={name:"Dylan",email:"dylan.do80@gmail.com",x:"dylan",role:"sales",seller:"dylan",status:"approved"};
 const WIAN={name:"Wian",email:"wian",x:"wian",role:"sales",seller:"wian",status:"approved"};
-const STAFF_SEED=[LUAN,DYLAN,WIAN];
+const SGM={name:"SGM",email:"sablesgm1@gmail.com",x:"sablesgm1",role:"sales",seller:"sgm",status:"approved"};
+const STAFF_SEED=[LUAN,DYLAN,WIAN,SGM];
 const PASS_REV=2;
 function esc(s){
   const amp=String.fromCharCode(38)+"amp;";
@@ -56,7 +57,7 @@ function setPhonePass(id,pass){
   if(pass.length<8) return "Eight characters or more.";
   let user=findStaff(id);
   if(!user&&!id) user=house();
-  if(!user) return "Use Luan, Dylan or Wian.";
+  if(!user) return "Use Luan, Dylan, Wian or SGM.";
   user.password=pass;
   user.status="approved";
   const i=(S.users||[]).findIndex(function(u){return u&&norm(u.email)===norm(user.email)});
@@ -448,6 +449,7 @@ function applyBook(j){
 }
 let S=load();
 let mode="in";
+let gateEmail="";
 let tab="desk";
 let toast="";
 let autoUndo=[];
@@ -967,9 +969,9 @@ function Gate(){
   const first=needsLocalPass()&&mode!=="ask";
   const showReset=mode==="reset"||first;
   let form="";
-  if(showReset) form='<form class="card" id="reset"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Eight characters or more" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. Each person sets their own.</p>';
-  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required /><label>Password</label><input name="password" type="password" required minlength="6" /><button class="solid" type="submit">Send request</button></form>';
-  else form='<form class="card" id="signin"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan or Wian — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>Password</label><input name="password" type="password" autocomplete="current-password" placeholder="Password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
+  if(showReset) form='<form class="card" id="reset"><label>Email or staff name</label><input name="email" value="'+esc(gateEmail)+'" placeholder="Luan, Dylan, Wian or SGM — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>New password</label><input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Eight characters or more" /><button class="solid" type="submit">Set password and enter</button></form><p class="sub">This phone only. Each person sets their own.</p>';
+  else if(mode==="ask") form='<form class="card" id="ask"><label>Name</label><input name="name" required /><label>Email</label><input name="email" type="email" required placeholder="sablesgm1@gmail.com" /><label>Password</label><input name="password" type="password" required minlength="8" /><button class="solid" type="submit">Send request</button></form><p class="sub">House sales already on the book set a password on Log in. A request does not open the desk on its own.</p>';
+  else form='<form class="card" id="signin"><label>Email or staff name</label><input name="email" placeholder="Luan, Dylan, Wian or SGM — can stay blank" autocomplete="username" autocapitalize="none" spellcheck="false" /><label>Password</label><input name="password" type="password" autocomplete="current-password" placeholder="Password" /><button class="solid" type="submit">Enter</button></form><button class="ghost" type="button" id="forgot" style="margin-top:10px">Forgot password</button>';
   const title=showReset?"Set a password":mode==="ask"?"Request Sable":"Log in";
   const sub=showReset?"This phone only. Eight characters or more. Name can stay blank.":"Staff only. Password lives on this phone. Name can stay blank.";
   const back=mode==="in"||first
@@ -1503,7 +1505,7 @@ const IDLE_MS=2*3600000;
 function onSharedBook(seller){
   const id=norm(seller);
   if(!id) return false;
-  if(id==="luan"||id==="dylan"||id==="wian") return true;
+  if(id==="luan"||id==="dylan"||id==="wian"||id==="sgm") return true;
   const u=staffUser(id);
   if(!u||u.status!=="approved") return false;
   return u.sharedBook===true||u.onBook===true;
@@ -1520,6 +1522,7 @@ function sharedBookSellers(){
   add("dylan");
   add("luan");
   add("wian");
+  add("sgm");
   (S.users||[]).forEach(function(u){
     if(u&&u.status==="approved") add(u.seller||u.x);
   });
@@ -1536,7 +1539,7 @@ function paidPairsSold(seller){
 }
 function pickAssignee(){
   const sellers=sharedBookSellers();
-  const order={dylan:0,luan:1,wian:2};
+  const order={dylan:0,luan:1,wian:2,sgm:3};
   sellers.sort(function(a,b){
     const pa=paidPairsSold(a);
     const pb=paidPairsSold(b);

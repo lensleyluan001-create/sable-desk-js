@@ -2,11 +2,15 @@ const PHOTO="https://raw.githubusercontent.com/lensleyluan001-create/sable-looks
 const SELLERS=["wian","luan","dylan"];
 const SL={wian:"Wian",luan:"Luan",dylan:"Dylan"};
 const UK=["3","4","5","6","7","8","9","10","11","12","13"];
-const HIDES=[["book","As photographed"],["tan","Tan"],["brown","Brown"],["dark","Dark brown"],["black","Black"],["olive","Olive"]];
-const HIDE_SWATCH={book:"#8a7a68",tan:"#c4a574",brown:"#6b4634",dark:"#3a2418",black:"#14110e",olive:"#5a6348"};
+const HIDES=[["book","As photographed"],["tan","Tan"],["brown","Brown"],["dark","Dark brown"],["black","Black"],["olive","Olive"],["grey","Grey"],["navy","Navy"],["white","White"],["cream","Cream"],["wine","Wine"]];
+const HIDE_SWATCH={book:"#8a7a68",tan:"#c4a574",brown:"#6b4634",dark:"#3a2418",black:"#14110e",olive:"#5a6348",grey:"#8a8880",navy:"#1e3a5f",white:"#f3eee6",cream:"#eadcc4",wine:"#7a1f2b"};
 const TYPE_SLUG={"Vellie":"vellie","Wool-lined vellie":"vellie","Kids vellie":"vellie","Golfer":"golfer","Chelsea":"chelsea","Derby":"derby","Kids derby":"derby","Hiking boot":"hike","Combat boot":"combat","Loafer":"loafer","Sandal":"sandal","Thong":"thong","Zip boot":"zip","Wool-lined boot":"woolboot","Wool-lined slipper":"slip"};
-const LACE_COLS=[["natural","Rawhide"],["tan","Tan"],["brown","Brown"],["black","Black"],["olive","Olive"],["white","White"]];
-const STITCH_COLS=[["cream","Cream"],["tan","Tan"],["brown","Brown"],["black","Black"],["olive","Olive"],["white","White"]];
+const LACE_COLS=[["natural","Rawhide"],["tan","Tan"],["brown","Brown"],["black","Black"],["olive","Olive"],["white","White"],["aqua","Aqua"],["navy","Navy"]];
+const STITCH_COLS=[["cream","Cream"],["tan","Tan"],["brown","Brown"],["black","Black"],["olive","Olive"],["white","White"],["aqua","Aqua"],["navy","Navy"]];
+const ELASTIC_COLS=STITCH_COLS;
+const SOLE_OPTS=[["leather","Leather"],["crepe","Crepe"],["rubber","Rubber"],["commando","Commando"]];
+const LINING_OPTS=[["leather","Leather"],["wool","Wool"]];
+const HARDWARE_OPTS=[["brass","Brass"],["black","Black"],["nickel","Nickel"]];
 const EXTRA_FEE=50;
 const SOURCES=[["whatsapp","WhatsApp"],["website","Website"],["instagram","Instagram"],["walk-in","Walk-in"],["referral","Referral"],["other","Other"]];
 const STAGES=[["new","New"],["contacted","Working"],["qualified","Working"],["negotiation","Working"],["closed","Closed"],["lost","Lost"]];
@@ -33,7 +37,13 @@ function looksOf(){
 }
 function matchLook(p,type){return !type||p.look===type}
 function shoe(sku){return PAIRS.find(p=>p.sku===String(sku))||null}
-function hideName(id){const h=HIDES.find(x=>x[0]===id);return h?h[1]:"As photographed"}
+function hideId(raw){
+  const s=String(raw||"").trim().toLowerCase().replace(/[_]+/g," ").replace(/\s+/g," ");
+  if(!s||s==="book"||s==="as photographed"||s==="as-photographed") return "book";
+  const hit=HIDES.find(function(h){return h[0]===s||h[1].toLowerCase()===s});
+  return hit?hit[0]:"book";
+}
+function hideName(id){const h=HIDES.find(x=>x[0]===hideId(id));return h?h[1]:"As photographed"}
 function typeSlug(look){return TYPE_SLUG[look]||"vellie"}
 function studioSrc(slug,n){return viewHost()+slug+"-"+n+".jpg?v=5"}
 function viewsOf(p,hide){
@@ -44,7 +54,7 @@ function hideSwatch(id){return HIDE_SWATCH[id]||HIDE_SWATCH.book}
 function hideChips(on,attr,short){
   attr=attr||"data-hide";
   on=on||"book";
-  const shortLab={book:"Book",tan:"Tan",brown:"Brown",dark:"Dark",black:"Black",olive:"Olive"};
+  const shortLab={book:"Book",tan:"Tan",brown:"Brown",dark:"Dark",black:"Black",olive:"Olive",grey:"Grey",navy:"Navy",white:"White",cream:"Cream",wine:"Wine"};
   return HIDES.map(([id,lab])=>{
     const t=short?shortLab[id]||lab:lab;
     return '<button class="hide'+(on===id?" on":"")+'" type="button" '+attr+'="'+id+'" title="'+lab+'"><span class="sw" style="background:'+hideSwatch(id)+'"></span>'+t+"</button>";
@@ -177,18 +187,37 @@ function hookTurn(setView){
   });
 }
 function lacedLook(look){return /vellie|golfer|derby|hiking|combat|wool-lined boot|zip/i.test(String(look||""))}
+function extraNoteIsSpec(note){
+  const n=String(note||"").trim().toLowerCase();
+  if(!n) return false;
+  return n.split(/\s*[·,;|/]\s*/).every(function(p){
+    return /^(stitch|laces|lace|elastic|sole|lining|hardware|laser)\b/.test(String(p||"").trim());
+  });
+}
 function extraFix(e){
   e=e&&typeof e==="object"?e:{};
+  const customNote=String(e.customNote||"");
+  const customFee=Number(e.customFee||0)||0;
+  let custom=!!e.custom;
+  if(custom&&!customFee&&extraNoteIsSpec(customNote)) custom=false;
   return {
     laser:!!e.laser,
     laserPhoto:String(e.laserPhoto||""),
     laces:!!e.laces,
-    laceColour:e.laceColour||"natural",
+    laceColour:e.laceColour==="rawhide"?"natural":(e.laceColour||"natural"),
     stitch:!!e.stitch,
     stitchColour:e.stitchColour||"cream",
-    custom:!!e.custom,
-    customNote:String(e.customNote||""),
-    customFee:Number(e.customFee||0)||0
+    elastic:!!e.elastic,
+    elasticColour:e.elasticColour||e.elasticId||"cream",
+    sole:!!e.sole,
+    soleKind:e.soleKind||e.soleId||"leather",
+    lining:!!e.lining,
+    liningKind:e.liningKind||e.liningId||"leather",
+    hardware:!!e.hardware,
+    hardwareKind:e.hardwareKind||e.hardwareId||"brass",
+    custom:custom,
+    customNote:customNote,
+    customFee:customFee
   };
 }
 function extraSum(e,qty){
@@ -198,6 +227,10 @@ function extraSum(e,qty){
   if(e.laser) n+=EXTRA_FEE;
   if(e.laces) n+=EXTRA_FEE;
   if(e.stitch) n+=EXTRA_FEE;
+  if(e.elastic) n+=EXTRA_FEE;
+  if(e.sole) n+=EXTRA_FEE;
+  if(e.lining) n+=EXTRA_FEE;
+  if(e.hardware) n+=EXTRA_FEE;
   n+=e.customFee;
   return n*qty;
 }
@@ -207,7 +240,11 @@ function extraBits(e){
   if(e.laser) bits.push("Laser");
   if(e.laces) bits.push("Laces "+(LACE_COLS.find(x=>x[0]===e.laceColour)||[e.laceColour,e.laceColour])[1]);
   if(e.stitch) bits.push("Stitch "+(STITCH_COLS.find(x=>x[0]===e.stitchColour)||[e.stitchColour,e.stitchColour])[1]);
-  if(e.custom) bits.push("Custom");
+  if(e.elastic) bits.push("Elastic "+(ELASTIC_COLS.find(x=>x[0]===e.elasticColour)||[e.elasticColour,e.elasticColour])[1]);
+  if(e.sole) bits.push("Sole "+(SOLE_OPTS.find(x=>x[0]===e.soleKind)||[e.soleKind,e.soleKind])[1]);
+  if(e.lining) bits.push("Lining "+(LINING_OPTS.find(x=>x[0]===e.liningKind)||[e.liningKind,e.liningKind])[1]);
+  if(e.hardware) bits.push("Hardware "+(HARDWARE_OPTS.find(x=>x[0]===e.hardwareKind)||[e.hardwareKind,e.hardwareKind])[1]);
+  if(e.custom&&!extraNoteIsSpec(e.customNote)) bits.push("Custom");
   return bits;
 }
 function extraLabel(e){
@@ -226,12 +263,20 @@ function extrasHtml(e,look,kind){
   const laserOn=e.laser?" on":"";
   const laceOn=e.laces?" on":"";
   const stitchOn=e.stitch?" on":"";
+  const elasticOn=e.elastic?" on":"";
+  const soleOn=e.sole?" on":"";
+  const liningOn=e.lining?" on":"";
+  const hardwareOn=e.hardware?" on":"";
   const customOn=e.custom?" on":"";
   let html='<label>Extras</label><div class="chips extras-row">'+
     '<button class="chip'+laserOn+'" type="button" data-'+kind+'="laser">Laser · R50</button>'+
     (laced?'<button class="chip'+laceOn+'" type="button" data-'+kind+'="laces">Laces · R50</button>':"")+
     '<button class="chip'+stitchOn+'" type="button" data-'+kind+'="stitch">Stitching · R50</button>'+
-    '<button class="chip'+customOn+'" type="button" data-'+kind+'="custom">Custom · quoted</button></div>';
+    '<button class="chip'+elasticOn+'" type="button" data-'+kind+'="elastic">Elastic · R50</button>'+
+    '<button class="chip'+soleOn+'" type="button" data-'+kind+'="sole">Sole · R50</button>'+
+    '<button class="chip'+liningOn+'" type="button" data-'+kind+'="lining">Lining · R50</button>'+
+    '<button class="chip'+hardwareOn+'" type="button" data-'+kind+'="hardware">Hardware · R50</button>'+
+    '<button class="chip'+customOn+'" type="button" data-'+kind+'="custom">Custom last · quoted</button></div>';
   if(e.laser){
     html+='<label>Photo to laser</label><input type="file" id="'+kind+'-laser" accept="image/*" />';
     if(e.laserPhoto) html+='<img class="laser-preview" src="'+e.laserPhoto+'" alt="Laser art" />';
@@ -243,12 +288,24 @@ function extrasHtml(e,look,kind){
   if(e.stitch){
     html+='<label>Stitch colour</label><div class="chips">'+colChips(STITCH_COLS,e.stitchColour,"data-"+kind+"stitch")+"</div>";
   }
-  if(e.custom){
-    html+='<label>Custom</label><textarea id="'+kind+'-custom" placeholder="What to change on the pair.">'+esc(e.customNote||"")+'</textarea>';
-    if(kind==="p") html+='<label>Custom amount</label><input id="p-customfee" inputmode="numeric" value="'+(e.customFee||"")+'" placeholder="Quoted ZAR" />';
-    else html+='<p class="meta">Custom is quoted. Sable will confirm.</p>';
+  if(e.elastic){
+    html+='<label>Elastic colour</label><div class="chips">'+colChips(ELASTIC_COLS,e.elasticColour,"data-"+kind+"elastic")+"</div>";
   }
-  html+='<p class="hint extra-hint">Laser, laces and stitching are R50 each. Custom depends on the work. Written on the ticket, not drawn on the photo.</p>';
+  if(e.sole){
+    html+='<label>Sole</label><div class="chips">'+colChips(SOLE_OPTS,e.soleKind,"data-"+kind+"sole")+"</div>";
+  }
+  if(e.lining){
+    html+='<label>Lining</label><div class="chips">'+colChips(LINING_OPTS,e.liningKind,"data-"+kind+"lining")+"</div>";
+  }
+  if(e.hardware){
+    html+='<label>Hardware</label><div class="chips">'+colChips(HARDWARE_OPTS,e.hardwareKind,"data-"+kind+"hw")+"</div>";
+  }
+  if(e.custom){
+    html+='<label>Custom last</label><textarea id="'+kind+'-custom" placeholder="What changes on the last — not stitch or laces.">'+esc(e.customNote||"")+'</textarea>';
+    if(kind==="p") html+='<label>Custom amount</label><input id="p-customfee" inputmode="numeric" value="'+(e.customFee||"")+'" placeholder="Quoted ZAR" />';
+    else html+='<p class="meta">Custom last is quoted. Sable will confirm.</p>';
+  }
+  html+='<p class="hint extra-hint">Laser, laces, stitching, elastic, sole, lining and hardware are R50 each. Custom last is quoted. Written on the ticket, not drawn on the photo.</p>';
   return html;
 }
 function shrinkPic(file,done){
@@ -275,6 +332,10 @@ function hookExtras(kind,getEx,setEx){
     if(k==="laser") ex.laser=!ex.laser;
     if(k==="laces") ex.laces=!ex.laces;
     if(k==="stitch") ex.stitch=!ex.stitch;
+    if(k==="elastic") ex.elastic=!ex.elastic;
+    if(k==="sole") ex.sole=!ex.sole;
+    if(k==="lining") ex.lining=!ex.lining;
+    if(k==="hardware") ex.hardware=!ex.hardware;
     if(k==="custom") ex.custom=!ex.custom;
     if(!ex.laser) ex.laserPhoto="";
     if(!ex.custom){ex.customNote="";ex.customFee=0}
@@ -290,6 +351,30 @@ function hookExtras(kind,getEx,setEx){
     const ex=extraFix(getEx());
     ex.stitch=true;
     ex.stitchColour=b.getAttribute("data-"+kind+"stitch")||"cream";
+    setEx(ex);
+  });
+  document.querySelectorAll("[data-"+kind+"elastic]").forEach(b=>b.onclick=function(){
+    const ex=extraFix(getEx());
+    ex.elastic=true;
+    ex.elasticColour=b.getAttribute("data-"+kind+"elastic")||"cream";
+    setEx(ex);
+  });
+  document.querySelectorAll("[data-"+kind+"sole]").forEach(b=>b.onclick=function(){
+    const ex=extraFix(getEx());
+    ex.sole=true;
+    ex.soleKind=b.getAttribute("data-"+kind+"sole")||"leather";
+    setEx(ex);
+  });
+  document.querySelectorAll("[data-"+kind+"lining]").forEach(b=>b.onclick=function(){
+    const ex=extraFix(getEx());
+    ex.lining=true;
+    ex.liningKind=b.getAttribute("data-"+kind+"lining")||"leather";
+    setEx(ex);
+  });
+  document.querySelectorAll("[data-"+kind+"hw]").forEach(b=>b.onclick=function(){
+    const ex=extraFix(getEx());
+    ex.hardware=true;
+    ex.hardwareKind=b.getAttribute("data-"+kind+"hw")||"brass";
     setEx(ex);
   });
   const laser=document.getElementById(kind+"-laser");

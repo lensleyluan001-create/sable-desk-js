@@ -360,6 +360,11 @@ function hookDesk(){
     const on=b.getAttribute("data-paid")==="1";
     const l=S.leads.find(x=>x.id===personId);
     const proof=l&&hasProof(l);
+    if(on&&!proof){
+      toast="Drop EFT proof before you mark paid.";
+      draw();
+      return;
+    }
     patchLead(personId,{
       paid:on,
       status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
@@ -394,9 +399,15 @@ function hookDesk(){
     if(!personId) return;
     const qty=Number(b.getAttribute("data-pqty")||1)||1;
     const l=S.leads.find(x=>x.id===personId)||{};
-    const items=itemsOf(l).map(function(it,i){return i===0?Object.assign({},it,{qty}):it});
-    const next=Object.assign({},l,{qty,items});
-    patchLead(personId,lockListed(next,itemListedSum(items)));
+    const items=itemsOf(l);
+    if(items.length>1){
+      toast="Two different lasts. Change each line, not the pair count.";
+      draw();
+      return;
+    }
+    const nextItems=items.map(function(it,i){return i===0?Object.assign({},it,{qty}):it});
+    const next=Object.assign({},l,{qty,items:nextItems});
+    patchLead(personId,lockListed(next,itemListedSum(nextItems)));
     draw();
   });
   document.querySelectorAll("[data-chide]").forEach(b=>b.onclick=function(){
@@ -565,6 +576,11 @@ function hookDesk(){
     const id=b.getAttribute("data-todopaid");
     if(!id) return;
     const l=S.leads.find(x=>x.id===id);
+    if(!l||!hasProof(l)){
+      toast="Drop EFT proof before you mark paid.";
+      draw();
+      return;
+    }
     patchLead(id,{
       paid:true,
       status:l&&l.status==="new"?"contacted":(l&&l.status),
@@ -572,6 +588,10 @@ function hookDesk(){
       nextActionAt:null
     });
     toast="Marked paid.";
+    draw();
+  });
+  document.querySelectorAll("[data-needproof]").forEach(b=>b.onclick=function(){
+    toast="Drop EFT proof before you mark paid.";
     draw();
   });
   document.querySelectorAll("[data-proof]").forEach(function(inp){
@@ -604,10 +624,20 @@ function hookDesk(){
   });
   document.querySelectorAll("[data-track]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    const v=String(b.getAttribute("data-track")||"");
-    const stage=v==="ready"||v==="dispatch"?v:"";
+    const v=String(b.getAttribute("data-track")||"").toLowerCase();
+    const allowed={cut:1,last:1,stitch:1,qc:1,pack:1,ready:1,dispatch:1};
+    const stage=allowed[v]?v:"";
+    const msg={
+      cut:"Cut — on their track page.",
+      last:"On the last — on their track page.",
+      stitch:"Stitching — on their track page.",
+      qc:"QC — on their track page.",
+      pack:"Pack — on their track page.",
+      ready:"Ready for collect — on their track page.",
+      dispatch:"Out for delivery — on their track page."
+    };
     patchLead(personId,{trackStage:stage});
-    toast=stage==="ready"?"Ready for collect — on their track page.":stage==="dispatch"?"Out for delivery — on their track page.":"Track stage cleared.";
+    toast=msg[stage]||"Track stage cleared.";
     draw();
   });
   document.querySelectorAll("[data-proofzoom]").forEach(b=>b.onclick=function(){

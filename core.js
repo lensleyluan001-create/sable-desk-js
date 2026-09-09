@@ -138,7 +138,7 @@ function itemFix(it){
     look:String(it.look||(p&&p.look)||""),
     size:String(it.size||""),
     qty,
-    colour:it.colour||"book",
+    colour:hideId(it.colour||"book"),
     extras,
     listedPrice,
     listed
@@ -242,7 +242,7 @@ function lockListedFromLead(l){
 }
 function extraScore(e){
   e=extraFix(e);
-  return (e.laser?1:0)+(e.laces?1:0)+(e.stitch?1:0)+(e.custom?1:0)+Number(e.customFee||0);
+  return (e.laser?1:0)+(e.laces?1:0)+(e.stitch?1:0)+(e.elastic?1:0)+(e.sole?1:0)+(e.lining?1:0)+(e.hardware?1:0)+(e.custom?1:0)+Number(e.customFee||0);
 }
 function extraPick(a,b){
   return extraScore(a)>=extraScore(b)?extraFix(a):extraFix(b);
@@ -286,7 +286,7 @@ function leadFix(l){
     paidAmount:Number(l.paidAmount||0)||0,
     delivery:l.delivery||"collect",
     deliveryFee:Number(l.deliveryFee||0)||0,
-    colour:first.colour||l.colour||"book",
+    colour:hideId(first.colour||l.colour||"book"),
     extras,
     listedPrice:locked.listedPrice,
     nextAction:nextAction,
@@ -296,7 +296,7 @@ function leadFix(l){
     proofAt:l.proofAt||null,
     proofBy:String(l.proofBy||""),
     proofStatus:String(l.proofStatus||""),
-    trackStage:trackFlag({trackStage:l.trackStage,nextAction:""}),
+    trackStage:trackStageOf(l),
     createdAt:l.createdAt||Date.now(),
     updatedAt:healed?Date.now():(l.updatedAt||l.createdAt||Date.now()),
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
@@ -505,8 +505,13 @@ function bookOf(l){
   if(l.owner&&SELLERS.indexOf(l.owner)>=0) return l.owner;
   return matchSeller(l.salesman)||null;
 }
+function isProbeLead(l){
+  const n=String(l&&l.name||"").trim().toLowerCase();
+  if(!n) return false;
+  return n==="thabo desk"||/^probe\b/.test(n)||/\bdesk probe\b/.test(n);
+}
 function leads(){
-  let rows=S.leads.slice();
+  let rows=S.leads.slice().filter(function(l){return !isProbeLead(l)});
   if(!houseView()) rows=rows.filter(l=>bookOf(l)===mySeller());
   if(houseView()&&deskFilter!=="all") rows=rows.filter(l=>bookOf(l)===deskFilter);
   return rows;
@@ -544,7 +549,8 @@ function isCustomPair(l){
   const items=itemsOf(l);
   if(items.some(function(it){
     const ex=extraFix(it.extras);
-    if(ex.custom||ex.customFee) return true;
+    if(ex.customFee) return true;
+    if(ex.custom&&!extraNoteIsSpec(ex.customNote)) return true;
     return itemIsCustom(it);
   })) return true;
   const book=bookListed(l);
@@ -622,6 +628,10 @@ function pairCostOf(l){
     return n+(((sp&&sp.cost)||0)*Number(it.qty||1));
   },0);
 }
+function pairProfitOf(l){
+  const t=ticket(l);
+  return Math.max(0,t.due-t.fee-pairCostOf(l));
+}
 function monthKey(ts){
   const d=new Date(Number(ts)||Date.now());
   if(isNaN(d.getTime())) return monthKey(Date.now());
@@ -674,7 +684,7 @@ function tallyMoney(rows){
     const l=rows[i];
     const t=ticket(l);
     const cost=pairCostOf(l);
-    const profit=Math.max(0,t.listed-cost);
+    const profit=pairProfitOf(l);
     const created=monthKey(l.createdAt);
     const paidAt=monthKey(l.updatedAt||l.createdAt);
     const owner=bookOf(l)||"floor";
@@ -849,11 +859,11 @@ function followMsg(l){
   return who+", checking in on the "+(l.sku||"")+" "+(l.look||"")+". Still want the pair?";
 }
 function clientWebUrl(){
-  return "https://sable-floor.vercel.app/want";
+  return "https://sable-floor-web.vercel.app";
 }
 function proofLink(l){
   if(!l) return "";
-  const base=clientWebUrl();
+  const base="https://sable-floor-web.vercel.app/want";
   if(l.id) return base+"?proof="+encodeURIComponent(l.id);
   if(l.invRef) return base+"?ref="+encodeURIComponent(l.invRef);
   return "";
@@ -867,6 +877,18 @@ function trackFlag(l){
   if(raw==="ready"||raw==="collect") return "ready";
   if(raw==="dispatch"||raw==="sent"||raw==="delivery") return "dispatch";
   return "";
+}
+function factoryStage(l){
+  const raw=String(l&&l.trackStage||"").trim().toLowerCase();
+  if(raw==="cut"||raw==="last"||raw==="stitch"||raw==="qc"||raw==="pack") return raw;
+  return "";
+}
+function trackStageOf(l){
+  return factoryStage(l)||trackFlag(l);
+}
+function factoryLabel(id){
+  const map={cut:"Cut",last:"On the last",stitch:"Stitching",qc:"QC",pack:"Pack"};
+  return map[id]||"";
 }
 function trackHint(l){
   const na=String(l&&l.nextAction||"");
@@ -888,6 +910,7 @@ function trackPublic(l){
   const qty=items.reduce(function(n,it){return n+it.qty},0)||1;
   const send=l.delivery==="local"||l.delivery==="int";
   const flag=trackHint(l);
+  const factory=factoryStage(l);
   const lost=String(l.status||"")==="lost";
   const closedPaid=String(l.status||"")==="closed"&&!!l.paid;
   const paid=!!l.paid;
@@ -898,8 +921,8 @@ function trackPublic(l){
   const received=((fresh||(st==="contacted"&&!sized))&&!invoiced&&!paid&&!flag&&!closedPaid)?"now":"done";
   let making="wait";
   if(received==="now") making="wait";
-  else if(closedPaid||paid||flag||invoiced) making="done";
-  else if(!fresh||sized) making="now";
+  else if(closedPaid||flag) making="done";
+  else if(factory||paid||invoiced||!fresh||sized) making="now";
   let payment="wait";
   const payNow=(invoiced||hasProof(l))&&!paid;
   if(paid) payment="done";
@@ -911,9 +934,10 @@ function trackPublic(l){
   const finished=closedPaid?"done":"wait";
   const payLabel=paid?"Payment received":"Waiting for payment";
   const readyLabel=send?"Out for delivery":"Ready for collect";
+  const makingLabel=factory?factoryLabel(factory):(qty>1?"Making your pairs":"Making your pair");
   const steps=[
     {id:"received",label:"Order received",state:lost&&received==="now"?"done":received},
-    {id:"making",label:qty>1?"Making your pairs":"Making your pair",state:lost?"wait":making},
+    {id:"making",label:makingLabel,state:lost?"wait":making},
     {id:"payment",label:payLabel,state:lost?"wait":payment},
     {id:"ready",label:readyLabel,state:lost?"wait":ready},
     {id:"done",label:"Done",state:lost?"wait":finished}
@@ -927,7 +951,7 @@ function trackPublic(l){
   else if(ready==="now") headline=readyLabel+".";
   else if(paid) headline="Payment received. We will tell you when it is ready.";
   else if(payment==="now") headline="Waiting for payment.";
-  else if(making==="now") headline=qty>1?"We are making your pairs.":"We are making your pair.";
+  else if(making==="now") headline=factory?(factoryLabel(factory)+"."):(qty>1?"We are making your pairs.":"We are making your pair.");
   else headline="We have your order.";
   return {
     name:String(l.name||"").trim().split(/\s+/)[0]||"Your order",
@@ -1395,7 +1419,9 @@ function todoCta(it){
     out=invoiceBtn(l,"solid tight")+
       draft+
       proofDropHtml(l)+
-      '<button class="ghost" type="button" data-todopaid="'+l.id+'">Confirm paid</button>'+todoPendBtn(l,it);
+      (hasProof(l)
+        ?'<button class="ghost" type="button" data-todopaid="'+l.id+'">Confirm paid</button>'
+        :'<button class="ghost" type="button" data-needproof="'+l.id+'">Need proof first</button>')+todoPendBtn(l,it);
   }else{
     out=(draft||'<button class="solid tight" type="button" data-go="person" data-id="'+l.id+'">Open</button>')+todoPendBtn(l,it);
   }
@@ -1715,7 +1741,9 @@ function standupCta(kind,row){
   if(kind==="unpaid"){
     return (proof?proofThumbHtml(l):proofDropHtml(l))+
       draft+
-      '<button class="solid tight" type="button" data-todopaid="'+l.id+'">'+(proof?"Mark paid":"Confirm paid")+"</button>"+
+      (proof
+        ?'<button class="solid tight" type="button" data-todopaid="'+l.id+'">Mark paid</button>'
+        :'<button class="solid tight" type="button" data-needproof="'+l.id+'">Need proof first</button>')+
       (proof?'<button class="ghost" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"");
   }
   return draft+'<button class="chip" type="button" data-go="person" data-id="'+l.id+'">Open</button>';

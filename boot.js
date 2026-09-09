@@ -68,10 +68,14 @@ function hookGate(){
     if(isHouse(f.email)||isHouse(f.name)){toast="House uses Set password on Log in.";mode="in";draw();return}
     const existing=findStaff(f.email)||findStaff(f.name);
     if(existing){
-      gateEmail=existing.email||String(f.email||"").trim();
-      toast="You're on the floor. Set a password.";
-      mode="reset";
-      draw();
+      const err=setPhonePass(existing.email||String(f.email||"").trim(), String(f.password||""));
+      if(err){
+        gateEmail=existing.email||String(f.email||"").trim();
+        toast=err;
+        mode="reset";
+        draw();
+        return;
+      }
       return;
     }
     S.requests=S.requests||[];

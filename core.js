@@ -219,10 +219,13 @@ function lockListed(l,total){
   items=spreadListedTotal(items,total);
   const listed=randZar(itemListedSum(items));
   const book=randZar(bookListed({items:items}));
+  // Money truth: always persist a positive pair total when items carry listed/book rand.
+  // Do not null-out when listed equals book (API turns null → 0).
+  const listedPrice=listed>0?listed:(book>0?book:null);
   return {
     items:items,
     qty:items.reduce(function(n,it){return n+it.qty},0)||1,
-    listedPrice:listed===book?null:listed
+    listedPrice:listedPrice
   };
 }
 function lockListedFromLead(l){
@@ -269,6 +272,31 @@ function leadFix(l){
   }
   const own=norm(l.owner);
   const owner=(own&&SELLERS.indexOf(own)>=0)?own:(matchSeller(l.salesman)||null);
+  let listedPrice=Number(locked.listedPrice)>0?Number(locked.listedPrice):null;
+  const itemSum=randZar(itemListedSum(items));
+  if(!(listedPrice>0)&&itemSum>0){
+    listedPrice=itemSum;
+    healed=true;
+  }
+  if(!(listedPrice>0)){
+    const book=randZar(bookListed({items:items}));
+    if(book>0){listedPrice=book;healed=true}
+  }
+  let paidAmount=Number(l.paidAmount||0)||0;
+  const proofSt=String(l.proofStatus||"").toLowerCase();
+  const proofIn=proofSt==="received"||proofSt==="in"||hasProof(l);
+  const draft={
+    items:items,
+    listedPrice:listedPrice,
+    deliveryFee:Number(l.deliveryFee||0)||0,
+    extras:extras,
+    sku:String(first.sku||l.sku||""),
+    qty:locked.qty
+  };
+  if((paid||proofIn)&&paidAmount===0){
+    const due=ticket(Object.assign({},l,draft)).due;
+    if(due>0){paidAmount=due;healed=true}
+  }
   return {
     id:l.id||uid(),
     name:String(l.name||"").trim(),
@@ -284,12 +312,12 @@ function leadFix(l){
     owner:owner,
     salesman:String(l.salesman||"").trim(),
     paid:paid,
-    paidAmount:Number(l.paidAmount||0)||0,
+    paidAmount:paidAmount,
     delivery:l.delivery||"collect",
     deliveryFee:Number(l.deliveryFee||0)||0,
     colour:hideId(first.colour||l.colour||"book"),
     extras,
-    listedPrice:locked.listedPrice,
+    listedPrice:listedPrice,
     nextAction:nextAction,
     nextActionAt:l.nextActionAt||null,
     invRef:String(l.invRef||""),

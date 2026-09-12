@@ -265,10 +265,11 @@ function leadFix(l){
   let nextAction=String(l.nextAction||l.next||"").trim();
   if(!nextAction&&status==="new"&&web) nextAction="Send the first WhatsApp";
   const paid=Boolean(l.paid);
-  let healed=false;
+  let copyHeal=false;
+  // moneyHeal fills listedPrice/paidAmount but must NOT bump updatedAt (vaultPush race).
   if(!paid&&status!=="lost"&&/eft received|close the card/i.test(nextAction)){
     nextAction=hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
-    healed=true;
+    copyHeal=true;
   }
   const own=norm(l.owner);
   const owner=(own&&SELLERS.indexOf(own)>=0)?own:(matchSeller(l.salesman)||null);
@@ -276,11 +277,10 @@ function leadFix(l){
   const itemSum=randZar(itemListedSum(items));
   if(!(listedPrice>0)&&itemSum>0){
     listedPrice=itemSum;
-    healed=true;
   }
   if(!(listedPrice>0)){
     const book=randZar(bookListed({items:items}));
-    if(book>0){listedPrice=book;healed=true}
+    if(book>0) listedPrice=book;
   }
   let paidAmount=Number(l.paidAmount||0)||0;
   const proofSt=String(l.proofStatus||"").toLowerCase();
@@ -295,7 +295,7 @@ function leadFix(l){
   };
   if((paid||proofIn)&&paidAmount===0){
     const due=ticket(Object.assign({},l,draft)).due;
-    if(due>0){paidAmount=due;healed=true}
+    if(due>0) paidAmount=due;
   }
   return {
     id:l.id||uid(),
@@ -327,7 +327,7 @@ function leadFix(l){
     proofStatus:String(l.proofStatus||""),
     trackStage:trackStageOf(l),
     createdAt:l.createdAt||Date.now(),
-    updatedAt:healed?Date.now():(l.updatedAt||l.createdAt||Date.now()),
+    updatedAt:copyHeal?Date.now():(l.updatedAt||l.createdAt||Date.now()),
     sitAt:l.sitAt||l.updatedAt||l.createdAt||Date.now()
   };
 }

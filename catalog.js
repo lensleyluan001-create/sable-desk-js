@@ -118,7 +118,7 @@ function wantDeskLead(opts){
     deliveryFee:fee,
     colour:first.colour||"book",
     extras:extraFix(first.extras),
-    listedPrice:Math.round(pairsListed)!==Math.round(bookTotal)?pairsListed:null,
+    listedPrice:Math.round(pairsListed)>0?pairsListed:null,
     note:String(opts.note||"").trim(),
     salesman:salesman,
     owner:owner,

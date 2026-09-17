@@ -12,7 +12,8 @@ const SOLE_OPTS=[["leather","Leather"],["crepe","Crepe"],["rubber","Rubber"],["c
 const LINING_OPTS=[["leather","Leather"],["wool","Wool"]];
 const HARDWARE_OPTS=[["brass","Brass"],["black","Black"],["nickel","Nickel"]];
 const EXTRA_FEE=50;
-const SOURCES=[["whatsapp","WhatsApp"],["website","Website"],["instagram","Instagram"],["walk-in","Walk-in"],["referral","Referral"],["other","Other"]];
+const SOURCES=[["whatsapp","WhatsApp"],["website","Website / enquire"],["instagram","Instagram"],["walk-in","Walk-in / stall"],["referral","Referral"],["other","Other"]];
+const LEAD_SOURCES=[["enquire_web","Enquire web"],["organic_ig","Organic IG"],["organic_fb","Organic FB"],["whatsapp","WhatsApp"],["stall_market","Stall / market"],["referral","Referral"],["manual","Manual"],["import","Import"],["ads_meta","Ads Meta"],["ads_google","Ads Google"],["ads_other","Ads other"]];
 const STAGES=[["new","New"],["contacted","Working"],["qualified","Working"],["negotiation","Working"],["closed","Closed"],["lost","Lost"]];
 const RAW=[[1,"Vellie",599,350],[2,"Vellie",649,449],[3,"Vellie",599,399],[4,"Golfer",1200,1000],[5,"Vellie",699,499],[6,"Vellie",599,399],[7,"Vellie",649,449],[8,"Wool-lined boot",799,599],[9,"Wool-lined boot",799,599],[10,"Wool-lined slipper",699,499],[11,"Hiking boot",799,599],[12,"Vellie",649,449],[13,"Derby",599,399],[14,"Derby",799,599],[15,"Chelsea",1100,900],[16,"Vellie",599,399],[17,"Vellie",799,599],[18,"Vellie",699,499],[19,"Vellie",699,499],[20,"Derby",599,399],[21,"Derby",599,399],[22,"Derby",799,599],[23,"Golfer",999,799],[24,"Derby",599,399],[25,"Derby",599,399],[26,"Derby",599,399],[27,"Sandal",449,249],[28,"Thong",449,249],[29,"Thong",449,249],[30,"Sandal",449,249],[31,"Derby",649,449],[32,"Zip boot",899,699],[33,"Derby",599,399],[34,"Derby",599,399],[35,"Derby",599,399],[36,"Vellie",649,449],[37,"Vellie",649,449],[38,"Vellie",649,449],[39,"Chelsea",1100,900],[40,"Chelsea",1100,900],[41,"Derby",649,449],[42,"Derby",599,399],[43,"Loafer",699,499],[44,"Vellie",649,449],[45,"Vellie",699,499],[46,"Vellie",699,499],[47,"Golfer",1000,750],[48,"Vellie",699,499],[49,"Thong",449,249],[50,"Vellie",699,499],[51,"Vellie",699,499],[52,"Vellie",699,499],[53,"Vellie",699,499],[54,"Vellie",699,499],[55,"Vellie",649,449],[56,"Hiking boot",799,599],[57,"Wool-lined vellie",799,599],[58,"Vellie",699,499],[59,"Vellie",799,599],[60,"Golfer",1300,1050],[61,"Hiking boot",799,599],[62,"Vellie",699,499],[63,"Golfer",1500,1250],[64,"Vellie",699,499],[65,"Combat boot",1400,1200],[66,"Combat boot",1400,1200],[67,"Combat boot",1400,1200],[68,"Combat boot",1200,1000],[69,"Chelsea",1100,900],[70,"Chelsea",1100,900],[71,"Chelsea",1100,900],[72,"Chelsea",1100,900],[73,"Chelsea",1100,900],[74,"Chelsea",1100,900],[75,"Chelsea",1100,900],[76,"Chelsea",1100,900],[77,"Chelsea",1100,900],[78,"Kids vellie",399,199],[79,"Kids derby",399,199],[80,"Hiking boot",1400,1200],[81,"Hiking boot",899,699],[82,"Hiking boot",1400,1200],[83,"Hiking boot",1400,1200],[84,"Hiking boot",1400,1200],[85,"Hiking boot",1400,1200],[86,"Hiking boot",1400,1200],[87,"Vellie",699,499],[88,"Combat boot",1600,1400],[89,"Vellie",699,499],[90,"Golfer",2000,1600],[91,"Zip boot",799,599],[92,"Vellie",699,499]];
 function viewHost(){
@@ -123,10 +124,22 @@ function wantDeskLead(opts){
     salesman:salesman,
     owner:owner,
     source:"website",
+    leadSource:"enquire_web",
+    heat:(function(){
+      const sized=items.every(function(it){return String(it.size||"").trim()});
+      if(name&&phone&&items.length&&sized) return "hot";
+      return "warm";
+    })(),
     status:"new",
     paid:false,
     nextAction:"Send the first WhatsApp",
-    nextActionAt:null,
+    nextActionAt:(function(){
+      const sized=items.every(function(it){return String(it.size||"").trim()});
+      if(!(name&&phone&&items.length&&sized)) return null;
+      const d=new Date(now);d.setHours(17,0,0,0);
+      if(d.getTime()<=now) return new Date(now+2*3600000).toISOString();
+      return d.toISOString();
+    })(),
     sitAt:now,
     createdAt:now,
     updatedAt:now

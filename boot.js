@@ -178,10 +178,10 @@ function doDone(tid){
   const it=items.find(x=>x.id===tid);
   if(!it||!it.lead) return;
   const l=it.lead;
-  if(it.kind==="whatsapp") patchLead(l.id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+  if(it.kind==="whatsapp") patchLead(l.id,{status:"quoted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
   else if(it.kind==="size") patchLead(l.id,{nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
-  else if(it.kind==="close"){patchLead(l.id,{status:"closed",paid:true,nextAction:"Closed. Paid.",nextActionAt:null});toast="Closed. Next up."}
-  else if(it.kind==="follow"&&/lost/i.test(it.step)) patchLead(l.id,{status:"lost",nextAction:"Lost"});
+  else if(it.kind==="close"){patchLead(l.id,{status:"won",paid:true,nextAction:"Won. Paid.",nextActionAt:null});toast="Won. Next up."}
+  else if(it.kind==="follow"&&/lost/i.test(it.step)){const reason=window.prompt("Lost reason?","unspecified")||"unspecified";patchLead(l.id,{status:"lost",lostReason:reason,nextAction:"Lost",nextActionAt:null});}
   else if(it.kind==="pay") patchLead(l.id,{nextAction:"Invoice sent. Waiting on EFT",nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
   else if(it.kind==="follow") patchLead(l.id,{nextAction:l.nextAction||"Follow up",nextActionAt:new Date(Date.now()+24*3600000).toISOString()});
   else patchLead(l.id,{nextAction:it.step,nextActionAt:new Date(Date.now()+12*3600000).toISOString()});
@@ -325,7 +325,7 @@ function hookDesk(){
     const items=[{sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,colour:cap.colour||"book",extras:extras,listedPrice:listedPrice,listed:listedPrice||p.price}];
     const lead=leadFix({
       id:uid(),name:cap.name,phone:cap.phone,sku:p.sku,look:p.look,size:cap.size,qty:cap.qty,items,
-      source:cap.source,status:"new",note:cap.note,owner:houseView()?cap.owner:mySeller(),
+      source:cap.source,leadSource:mapLegacyLeadSource(cap.leadSource||cap.source||"manual"),heat:heatOfLead({name:cap.name,phone:cap.phone,sku:cap.sku,size:cap.size}),status:"new",nextActionAt:sameDayNextActionAt(Date.now()),note:cap.note,owner:houseView()?cap.owner:mySeller(),
       delivery:cap.delivery,deliveryFee:feeOf(cap.delivery),colour:cap.colour||"book",
       extras:extras,listedPrice,
       createdAt:Date.now()
@@ -351,10 +351,24 @@ function hookDesk(){
   });
   document.querySelectorAll("[data-stage]").forEach(b=>b.onclick=function(){
     if(!personId) return;
-    const st=b.getAttribute("data-stage");
+    let st=b.getAttribute("data-stage");
+    const l=S.leads.find(x=>x.id===personId);
+    if(st==="closed") st="won";
+    if(st==="contacted"||st==="working") st="quoted";
+    if(st==="won"&&!(l&&paymentCleared(l))){
+      toast="Won needs payment cleared.";
+      st="quoted";
+    }
     const fields={status:st};
-    if(st==="closed") fields.nextAction="Closed.";
-    if(st==="lost") fields.nextAction="Lost";
+    if(st==="won") fields.nextAction="Won. Paid.";
+    if(st==="quoted") fields.nextAction=fields.nextAction||(l&&l.nextAction)||"Quote sent. Waiting on EFT";
+    if(st==="lost"){
+      const reason=window.prompt("Lost reason?");
+      if(reason==null||!String(reason).trim()){toast="Lost needs a reason.";draw();return}
+      fields.lostReason=String(reason).trim();
+      fields.nextAction="Lost";
+      fields.nextActionAt=null;
+    }
     patchLead(personId,fields);
     draw();
   });
@@ -377,8 +391,8 @@ function hookDesk(){
     }
     patchLead(personId,{
       paid:on,
-      status:on&&l&&l.status==="new"?"contacted":(l&&l.status),
-      nextAction:on?"EFT received. Close the card.":(proof?"Proof attached — verify EFT":"Chase the EFT"),
+      status:on?(paymentCleared(Object.assign({},l,{paid:true}))?"won":(statusCanon(l&&l.status)==="new"?"quoted":(l&&l.status))):(l&&l.status==="won"?"quoted":(l&&l.status)),
+      nextAction:on?"EFT received. Mark won.":(proof?"Proof attached — verify EFT":"Chase the EFT"),
       nextActionAt:on?null:l&&l.nextActionAt
     });
     toast=on?"Marked paid.":"Paid undone.";
@@ -560,7 +574,7 @@ function hookDesk(){
     const id=a.getAttribute("data-wa");
     const l=S.leads.find(x=>x.id===id);
     if(l&&(l.status==="new"||l.status==="inbox")){
-      patchLead(id,{status:"contacted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
+      patchLead(id,{status:"quoted",nextAction:"Asked for UK size",nextActionAt:new Date(Date.now()+2*3600000).toISOString()});
     }
   }));
   document.querySelectorAll("[data-take]").forEach(b=>b.onclick=function(){
@@ -593,7 +607,7 @@ function hookDesk(){
     }
     patchLead(id,{
       paid:true,
-      status:l&&l.status==="new"?"contacted":(l&&l.status),
+      status:l&&statusCanon(l.status)==="new"?"quoted":(l&&l.status),
       nextAction:"EFT received. Close the card.",
       nextActionAt:null
     });
@@ -779,7 +793,7 @@ async function ingest(){
       (S.leads||[]).forEach(function(l){if(l&&l.id) known[l.id]=true});
       applyBook(j);
       const fresh=(j.leads||[]).filter(function(l){
-        return l&&l.id&&!known[l.id]&&isWebApp(l)&&(l.status==="new"||l.status==="inbox");
+        return l&&l.id&&!known[l.id]&&(l.heat==="hot"||isWebApp(l))&&statusCanon(l.status)==="new";
       });
       if(!j.imported&&!S.importedAt&&((S.leads||[]).length||(S.meetings||[]).length)){
         S.importedAt=Date.now();

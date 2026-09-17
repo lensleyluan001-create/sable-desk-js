@@ -198,12 +198,13 @@ function viewMoney(rows){
 }
 function viewBoard(){
   const rows=leads();
-    const waiting=S.leads.filter(l=>!isProbeLead(l)&&!l.owner&&(l.source==="web"||l.source==="website")&&l.status!=="closed"&&l.status!=="lost");
-  const open=rows.filter(l=>l.status!=="closed"&&l.status!=="lost");
-  const grouped={new:[],working:[],closed:[],lost:[]};
+    const waiting=S.leads.filter(l=>!isProbeLead(l)&&!isWonStatus(l.status)&&l.status!=="lost"&&(l.heat==="hot"||((!l.heat)&&(l.source==="web"||l.source==="website"||l.leadSource==="enquire_web")))&&statusCanon(l.status)==="new");
+  const open=rows.filter(l=>!isWonStatus(l.status)&&l.status!=="lost");
+  const grouped={new:[],quoted:[],won:[],lost:[]};
   for(const l of rows) grouped[colOf(l.status)].push(l);
-  const metrics='<div class="metrics"><div class="card"><p>'+waiting.length+'</p><span>Inbox</span></div><div class="card"><p>'+open.length+'</p><span>Open</span></div><div class="card"><p>'+grouped.working.length+'</p><span>Working</span></div><div class="card"><p>'+grouped.closed.length+'</p><span>Closed</span></div></div>';
-  const cols=[["new","New"],["working","Working"],["closed","Closed"],["lost","Lost"]];
+  const overdue=rows.filter(l=>isOverdue(l)&&!isWonStatus(l.status)&&l.status!=="lost").length;
+  const metrics='<div class="metrics"><div class="card"><p>'+waiting.length+'</p><span>Sales Inbox</span></div><div class="card"><p>'+open.length+'</p><span>Open</span></div><div class="card"><p>'+grouped.quoted.length+'</p><span>Quoted</span></div><div class="card"><p>'+grouped.won.length+'</p><span>Won</span></div><div class="card"><p>'+overdue+'</p><span>Overdue</span></div></div>';
+  const cols=[["new","New"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
   function card(l){
     const p=shoe(l.sku);
     const t=ticket(l);
@@ -255,7 +256,7 @@ function viewClients(){
   const groups=clientGroups(leads());
   function ticketBits(l){
     const t=ticket(l);
-    const st=l.status==="lost"?"Lost":(l.status==="closed"?(l.paid?"Closed · paid":"Closed"):(l.paid?"Paid":"Open"));
+    const st=l.status==="lost"?"Lost":(isWonStatus(l.status)?(l.paid?"Won · paid":"Won"):(statusCanon(l.status)==="quoted"?"Quoted":(l.paid?"Paid":(l.heat==="hot"?"Hot":"Open"))));
     return [standStock(l),st].filter(Boolean).join(" · ");
   }
   function card(g){
@@ -295,7 +296,7 @@ function viewPerson(){
   if(!l) return '<p class="empty">Not on Sable.</p><button class="chip" type="button" data-tab="board">Board</button>';
   const t=ticket(l);
   const p=t.p;
-  const stages=[["new","New"],["contacted","Working"],["closed","Closed"],["lost","Lost"]];
+  const stages=[["new","New"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
   const age=l.updatedAt||l.createdAt;
   const ago=age?Math.max(0,Math.round((Date.now()-age)/3600000))+"h":"";
   const profit=seeCost()?pairProfitOf(l):null;
@@ -311,8 +312,8 @@ function viewPerson(){
   const stageChips=stages.map(([id,lab])=>'<button class="chip '+(colOf(l.status)===colOf(id)?"on":"")+'" type="button" data-stage="'+id+'">'+lab+"</button>").join("");
   const flag=trackFlag(l);
   const factory=factoryStage(l);
-  const factoryChips=(l.status==="lost"||(l.status==="closed"&&l.paid))?"":('<label>Factory</label><div class="chips">'+[["cut","Cut"],["last","Last"],["stitch","Stitch"],["qc","QC"],["pack","Pack"]].map(function(row){return '<button class="chip '+(factory===row[0]?"on":"")+'" type="button" data-track="'+row[0]+'">'+row[1]+"</button>";}).join("")+(factory?'<button class="chip" type="button" data-track="">Clear</button>':"")+"</div>");
-  const trackChips=(l.status==="lost"||(l.status==="closed"&&l.paid))?"":(factoryChips+'<label>Client track</label><div class="chips"><button class="chip '+(flag==="ready"?"on":"")+'" type="button" data-track="ready">Ready for collect</button><button class="chip '+(flag==="dispatch"?"on":"")+'" type="button" data-track="dispatch">Out for delivery</button>'+(flag?'<button class="chip" type="button" data-track="">Clear</button>':"")+"</div>");
+  const factoryChips=(l.status==="lost"||(isWonStatus(l.status)&&l.paid))?"":('<label>Factory</label><div class="chips">'+[["cut","Cut"],["last","Last"],["stitch","Stitch"],["qc","QC"],["pack","Pack"]].map(function(row){return '<button class="chip '+(factory===row[0]?"on":"")+'" type="button" data-track="'+row[0]+'">'+row[1]+"</button>";}).join("")+(factory?'<button class="chip" type="button" data-track="">Clear</button>':"")+"</div>");
+  const trackChips=(l.status==="lost"||(isWonStatus(l.status)&&l.paid))?"":(factoryChips+'<label>Client track</label><div class="chips"><button class="chip '+(flag==="ready"?"on":"")+'" type="button" data-track="ready">Ready for collect</button><button class="chip '+(flag==="dispatch"?"on":"")+'" type="button" data-track="dispatch">Out for delivery</button>'+(flag?'<button class="chip" type="button" data-track="">Clear</button>':"")+"</div>");
   const desk=houseView()?'<label>Who</label><div class="chips">'+SELLERS.map(s=>'<button class="chip '+(l.owner===s?"on":"")+'" type="button" data-assign="'+s+'">'+SL[s]+"</button>").join("")+"</div>":"";
   const money='<div class="money card">'+(t.mismatch?'<p class="price-mismatch-row">'+mismatchBadge(l)+"</p>":"")+'<div class="line"><span>'+(t.custom?"Custom":"Listed")+'</span><span class="price-edit"><input id="p-price" inputmode="numeric" value="'+t.listed+'" aria-label="Listed total" /></span></div>'+(t.custom?'<div class="line"><span>Book</span><span>'+zar(bookListed(l))+'</span></div>':'')+(t.extras?'<div class="line"><span>Extras</span><span>'+zar(t.extras)+'</span></div>':'')+'<div class="line"><span>Delivery</span><span>'+(t.fee?zar(t.fee):'Collect')+'</span></div><div class="line"><span>EFT due</span><span>'+zar(t.due)+'</span></div>'+(profit!=null?'<div class="line"><span>Pair profit</span><span>'+zar(profit)+'</span></div>':'')+'<div class="line"><span>Paid</span><span class="'+(l.paid?'ok':'')+'">'+(l.paid?'Yes':'No')+'</span></div><div class="line"><span>EFT</span><span>'+esc(payStateLabel(payState(l)))+"</span></div>"+proofCardHtml(l)+"</div>";
   const proofOn=hasProof(l);
@@ -322,7 +323,7 @@ function viewPerson(){
       ?'<button class="chip on" type="button" data-paid="1">Mark paid</button>'
       :'<button class="chip" type="button" data-needproof="'+l.id+'">Mark paid — need proof</button>');
   const rejectBtn=(!l.paid&&proofOn)?'<button class="chip" type="button" data-rejectproof="'+l.id+'">Reject proof</button>':"";
-  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+invoiceActionPair(l)+paidBtn+rejectBtn+(l.paid&&l.status!=="closed"?'<button class="chip" type="button" data-stage="closed">Close</button>':"")+"</div>";
+  const waRow='<div class="actions">'+(canChaseDraft(l)&&!proofOn?waPickerHtml(l,{primary:false,markNew:true}):"")+'<button class="chip" type="button" data-copytrack="'+l.id+'">Copy track link</button>'+invoiceActionPair(l)+paidBtn+rejectBtn+(l.paid&&!isWonStatus(l.status)?'<button class="chip" type="button" data-stage="won">Mark won</button>':"")+"</div>";
   const payLine='<p class="ticket-pay"><span'+(l.paid?' class="ok"':'')+'>Paid '+(l.paid?"Yes":"No")+"</span><span> · "+esc(payStateLabel(payState(l)))+"</span></p>";
   const stick='<div class="ticket-stick">'+payLine+waRow+"</div>";
   const sizeBlock=t.items.length>1?"":('<label>UK size</label><div class="chips">'+sizeChips+"</div>");
@@ -332,7 +333,7 @@ function viewPerson(){
     const chips=['<button class="chip '+(!it.size?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="">Later</button>'].concat(UK.map(s=>'<button class="chip '+(String(it.size)===s?"on":"")+'" type="button" data-item="'+i+'" data-itemsize="'+s+'">'+s+"</button>")).join("");
     return '<div class="order-line">'+(ip?'<img src="'+ip.img+'" alt="'+esc(it.sku)+'">':'<div></div>')+'<div><p class="name">'+esc(it.sku)+" · "+esc(it.look)+(it.extras&&it.extras.custom&&!extraNoteIsSpec(it.extras.customNote)?'<span class="nametag">Custom</span>':"")+'</p><p class="meta">'+esc(bits.join(" · "))+'</p><div class="chips">'+chips+"</div></div></div>";
   }).join("")+"</div>":"";
-  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="desk">Desk</button><button class="ghost" type="button" data-tab="todo">To-do</button><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.source?" · "+esc(l.source):"")+(t.qty>1?" · "+t.qty+" pairs":"")+(ago?" · last "+ago:"")+"</p>"+
+  return '<div class="row" style="margin-bottom:8px"><button class="ghost" type="button" data-tab="desk">Desk</button><button class="ghost" type="button" data-tab="todo">To-do</button><button class="ghost" type="button" data-tab="board">Board</button><button class="ghost" type="button" data-tab="capture">Next capture</button></div><p class="kicker">Working ticket</p><h1>'+esc(l.name)+'</h1><p class="meta">'+esc(l.phone)+(l.owner?" · "+SL[l.owner]:" · Unassigned")+(l.salesman?" · helped by "+esc(l.salesman):"")+(l.leadSource?" · "+esc(l.leadSource):(l.source?" · "+esc(l.source):""))+(l.heat?" · "+esc(l.heat):"")+(t.qty>1?" · "+t.qty+" pairs":"")+(ago?" · last "+ago:"")+"</p>"+
     stick+
     (p?'<article class="pair slim">'+pairImg+'<div class="pad"><p class="stock">'+esc(l.sku||"—")+nametag(l)+'</p><p class="meta">'+esc(l.look||"")+(l.size?" · UK "+esc(l.size):" · size open")+(t.items.length>1?" · first of "+t.qty:"")+'</p><p class="price">'+zar(t.due)+'</p><p class="kicker">EFT due</p></div></article>':'')+
     orderLines+

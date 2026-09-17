@@ -115,8 +115,8 @@ function clientGroups(rows){
   });
   return order.map(function(k){
     const tickets=map[k].slice().sort(function(a,b){
-      const ra=a.status==="lost"?2:a.status==="closed"?1:0;
-      const rb=b.status==="lost"?2:b.status==="closed"?1:0;
+      const ra=a.status==="lost"?2:isWonStatus(a.status)?1:0;
+      const rb=b.status==="lost"?2:isWonStatus(b.status)?1:0;
       if(ra!==rb) return ra-rb;
       return Number(b.updatedAt||b.createdAt||0)-Number(a.updatedAt||a.createdAt||0);
     });
@@ -125,7 +125,80 @@ function clientGroups(rows){
   });
 }
 function wa(phone,text){let d=digits(phone);if(d.length<9)return "";if(d[0]==="0")d="27"+d.slice(1);return "https://wa.me/"+d+(text?"?text="+encodeURIComponent(text):"")}
-function colOf(st){if(st==="new"||st==="inbox")return "new";if(st==="closed")return "closed";if(st==="lost")return "lost";return "working"}
+function leadSourceEnum(){return ["organic_ig","organic_fb","whatsapp","enquire_web","stall_market","referral","self_made_meta","self_made_google","ads_meta","ads_google","ads_other","manual","import"]}
+function mapLegacyLeadSource(src){
+  const s=String(src||"").toLowerCase().trim();
+  if(!s) return "manual";
+  if(leadSourceEnum().indexOf(s)>=0) return s;
+  if(s==="website"||s==="web"||s.indexOf("want")>=0||s.indexOf("lookbook")>=0) return "enquire_web";
+  if(s==="instagram"||s==="ig"||s.indexOf("insta")>=0) return "organic_ig";
+  if(s==="facebook"||s==="fb") return "organic_fb";
+  if(s==="whatsapp"||s==="wa") return "whatsapp";
+  if(s==="referral"||s==="refer") return "referral";
+  if(s==="walk-in"||s==="walkin"||s==="stall"||s==="market") return "stall_market";
+  if(s==="import") return "import";
+  return "manual";
+}
+function paymentCleared(l){
+  if(!l) return false;
+  if(l.paid===true) return true;
+  const ps=String(l.proofStatus||"").toLowerCase();
+  return (ps==="received"||ps==="cleared")&&!!l.paid;
+}
+function statusCanon(st,l){
+  const s=String(st||"").toLowerCase().trim();
+  if(s==="inbox") return "new";
+  if(s==="new") return "new";
+  if(s==="quoted"||s==="contacted"||s==="working"||s==="open") return "quoted";
+  if(s==="lost") return "lost";
+  if(s==="won") return "won";
+  if(s==="closed"){
+    if(l&&paymentCleared(l)) return "won";
+    return "quoted";
+  }
+  return "quoted";
+}
+function colOf(st){
+  const n=statusCanon(st);
+  if(n==="new"||n==="quoted"||n==="won"||n==="lost") return n;
+  return "quoted";
+}
+function isWonStatus(st){
+  const s=String(st||"").toLowerCase();
+  return s==="won"||s==="closed";
+}
+function isQuotedStatus(st){
+  const s=String(st||"").toLowerCase();
+  return s==="quoted"||s==="contacted"||s==="working"||s==="open";
+}
+function isOverdue(l,now){
+  now=now||Date.now();
+  const t=l&&l.nextActionAt?new Date(l.nextActionAt).getTime():0;
+  return !!(t&&now>t);
+}
+function sameDayNextActionAt(from){
+  const d=new Date(from||Date.now());
+  d.setHours(17,0,0,0);
+  if(d.getTime()<=Date.now()) return new Date(Date.now()+2*3600000).toISOString();
+  return d.toISOString();
+}
+function heatOfLead(l){
+  const h=String(l&&l.heat||"").toLowerCase();
+  if(h==="hot"||h==="warm"||h==="cold") return h;
+  const name=String(l&&l.name||"").trim();
+  const phone=String(l&&l.phone||"").trim();
+  const sku=String(l&&l.sku||(l&&l.items&&l.items[0]&&l.items[0].sku)||"").trim();
+  const size=String(l&&l.size||(l&&l.items&&l.items[0]&&l.items[0].size)||"").trim();
+  if(name&&phone&&sku&&size) return "hot";
+  if(name&&phone) return "warm";
+  return "cold";
+}
+function gateWonStatus(st,l){
+  const n=statusCanon(st,l);
+  if(n==="won"&&!(l&&paymentCleared(l))) return "quoted";
+  return n;
+}
+
 function splitOf(seller){if(seller==="wian")return {wian:.2,luan:.4,dylan:.3,house:.1};if(seller==="luan")return {wian:0,luan:.6,dylan:.3,house:.1};if(seller==="dylan")return {wian:0,luan:0,dylan:.9,house:.1};return {wian:0,luan:0,dylan:0,house:1}}
 function itemFix(it){
   it=it&&typeof it==="object"?it:{};
@@ -259,11 +332,17 @@ function leadFix(l){
   const extras=extraPick(l.extras,first.extras);
   if(items.length) items=items.map(function(it,i){return i===0?Object.assign({},it,{extras:extras}):it});
   const p=shoe(l.sku||first.sku);
-  const status=l.status||(l.stage==="inbox"?"new":l.stage)||"new";
+  const rawStatus=l.status||(l.stage==="inbox"?"new":l.stage)||"new";
+  const status=gateWonStatus(rawStatus,l);
   const src=String(l.source||"").toLowerCase();
-  const web=src==="web"||src==="website"||src.indexOf("want")>=0||src.indexOf("lookbook")>=0;
+  const web=src==="web"||src==="website"||src.indexOf("want")>=0||src.indexOf("lookbook")>=0||mapLegacyLeadSource(l.leadSource||l.lead_source||src)==="enquire_web";
+  const leadSource=String(l.leadSource||l.lead_source||"").trim()?mapLegacyLeadSource(l.leadSource||l.lead_source):mapLegacyLeadSource(src||(web?"website":"whatsapp"));
+  const heat=heatOfLead(Object.assign({},l,{status:status}));
   let nextAction=String(l.nextAction||l.next||"").trim();
-  if(!nextAction&&status==="new"&&web) nextAction="Send the first WhatsApp";
+  if(!nextAction&&status==="new"&&(web||heat==="hot")) nextAction="Send the first WhatsApp";
+  let nextActionAt=l.nextActionAt||null;
+  if(!nextActionAt&&status==="new"&&heat==="hot") nextActionAt=sameDayNextActionAt(l.createdAt||Date.now());
+  const lostReason=String(l.lostReason||l.lost_reason||"").trim();
   const paid=Boolean(l.paid);
   let copyHeal=false;
   // moneyHeal fills listedPrice/paidAmount but must NOT bump updatedAt (vaultPush race).
@@ -307,6 +386,9 @@ function leadFix(l){
     qty:locked.qty,
     items,
     source:web?"website":(l.source||"whatsapp"),
+    leadSource:leadSource,
+    heat:heat,
+    lostReason:lostReason,
     status:status,
     note:String(l.note||""),
     owner:owner,
@@ -319,7 +401,7 @@ function leadFix(l){
     extras,
     listedPrice:listedPrice,
     nextAction:nextAction,
-    nextActionAt:l.nextActionAt||null,
+    nextActionAt:nextActionAt,
     invRef:String(l.invRef||""),
     proofUrl:String(l.proofUrl||""),
     proofAt:l.proofAt||null,
@@ -648,7 +730,7 @@ function mergeWantIngest(incoming,rows){
     }
     if(isWantBurstDup(row,rows)) continue;
     rows.unshift(row);
-    if(isWebApp(row)&&(row.status==="new"||row.status==="inbox")) fresh.push(row);
+    if(isWebApp(row)&&(statusCanon(row.status)==="new"||row.heat==="hot")) fresh.push(row);
   }
   return {rows:keepLeads(rows).map(leadFix),fresh:fresh};
 }
@@ -738,7 +820,7 @@ function tallyMoney(rows){
     }
     listed+=t.listed;
     accruedProfit+=profit;
-    if(l.status!=="closed") openDue+=t.due;
+    if(!isWonStatus(l.status)) openDue+=t.due;
     if(!l.paid){
       if(isWaitingOnMoney(l)){
         eftDue+=t.due;
@@ -942,7 +1024,7 @@ function trackPublic(l){
   const flag=trackHint(l);
   const factory=factoryStage(l);
   const lost=String(l.status||"")==="lost";
-  const closedPaid=String(l.status||"")==="closed"&&!!l.paid;
+  const closedPaid=isWonStatus(l.status)&&!!l.paid;
   const paid=!!l.paid;
   const st=String(l.status||"new");
   const fresh=st==="new"||st==="inbox";
@@ -1114,7 +1196,7 @@ function staffName(){
 function isWaitingOnMoney(l){
   if(!l||l.paid||l.status==="lost") return false;
   if(hasProof(l)) return true;
-  if(l.status==="closed") return true;
+  if(isWonStatus(l.status)) return true;
   if(String(l.invRef||"").trim()) return true;
   const t=nextTodo(l);
   if(t&&(t.kind==="pay"||t.kind==="verify")) return true;
@@ -1129,12 +1211,12 @@ function nextStepLabel(l){
     if(!l.paid&&/eft received|close the card/i.test(t.step)) return hasProof(l)?"Proof attached — verify EFT":"Chase the EFT";
     return t.step;
   }
-  return String(l.nextAction||(l.status==="new"||l.status==="inbox"?"Send the first WhatsApp":"Open the card"));
+  return String(l.nextAction||(statusCanon(l.status)==="new"?"Send the first WhatsApp":"Open the card"));
 }
 function nextTodo(l){
   if(!l||l.status==="lost") return null;
-  if(l.status==="closed"&&l.paid) return null;
-  if(l.paid&&l.status!=="closed") return {kind:"close",step:"EFT is in",cta:"Mark closed",done:true,wa:false,lane:"now"};
+  if(isWonStatus(l.status)&&l.paid) return null;
+  if(l.paid&&!isWonStatus(l.status)) return {kind:"close",step:"EFT is in",cta:"Mark won",done:true,wa:false,lane:"now"};
   if(hasProof(l)&&!l.paid) return {kind:"verify",step:"Verify EFT",cta:"Mark paid",done:true,wa:false,lane:"now"};
   const now=Date.now();
   const due=l.nextActionAt?new Date(l.nextActionAt).getTime():0;
@@ -1143,8 +1225,8 @@ function nextTodo(l){
     const why=l.nextAction||(needsSize(l)?"Asked for UK size":!l.paid?"Invoice is out":"Pending");
     return {kind:"wait",step:why,cta:"Open",done:false,wa:false,lane:"wait"};
   }
-  if(l.status==="closed"&&!l.paid) return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
-  if(l.status==="new"||l.status==="inbox") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
+  if((isWonStatus(l.status)||isQuotedStatus(l.status))&&!l.paid) return {kind:"pay",step:"Chase the EFT",cta:"Chase EFT",done:true,wa:true,lane:"now"};
+  if(statusCanon(l.status)==="new") return {kind:"whatsapp",step:"Send the first WhatsApp",cta:"WhatsApp",done:true,wa:true,lane:"now"};
   if(needsSize(l)){
     const asked=/asked|uk size/i.test(String(l.nextAction||""));
     return {kind:"size",step:asked?"Chase the size":"Ask for UK size",cta:"WhatsApp",done:true,wa:true,lane:"now"};
@@ -1166,7 +1248,7 @@ function isPayConfirm(t,l){
 function slaOf(t,l,wait){
   t=t||nextTodo(l);
   wait=wait!=null?wait:sitMs(l);
-  if(!t||!l||l.status==="lost"||(l.status==="closed"&&l.paid)){
+  if(!t||!l||l.status==="lost"||(isWonStatus(l.status)&&l.paid)){
     return {needsLuan:false,escalateStaff:false,paySla:false,sla:false};
   }
   const paySla=isPayConfirm(t,l)&&!l.paid&&wait>3600000;
@@ -1218,7 +1300,7 @@ function todoWaText(it){
 function canChaseDraft(l){
   if(!l) return false;
   if(l.status==="lost") return false;
-  if(l.status==="closed"&&l.paid) return false;
+  if(isWonStatus(l.status)&&l.paid) return false;
   return true;
 }
 function wantsCustomerDraft(l){
@@ -1234,7 +1316,7 @@ function customerDraftText(l,kind){
   if(k==="follow") return followMsg(l);
   if(k==="pay") return invMsg(l);
   if(k==="size") return sizeMsg(l);
-  if(l.status==="new"||l.status==="inbox") return firstMsg(l);
+  if(statusCanon(l.status)==="new") return firstMsg(l);
   if(needsSize(l)) return sizeMsg(l);
   if(!l.paid) return invMsg(l);
   return followMsg(l);
@@ -1345,10 +1427,10 @@ function todoVerb(it){
 function todoStage(it){
   if(!it||!it.lead||it.kind==="take") return -1;
   const l=it.lead;
-  if(it.kind==="close"||(l.paid&&l.status!=="closed")) return 3;
+  if(it.kind==="close"||(l.paid&&!isWonStatus(l.status))) return 3;
   if(it.kind==="verify") return 2;
   if(it.kind==="pay"||!needsSize(l)) return 2;
-  if(it.kind==="size"||l.status==="contacted"||l.status==="working") return 1;
+  if(it.kind==="size"||isQuotedStatus(l.status)) return 1;
   return 0;
 }
 function todoPipe(it){
@@ -1589,7 +1671,7 @@ function isWaitLane(l){
 function isDeadLead(l){
   if(!l) return true;
   if(l.status==="lost") return true;
-  if(l.status==="closed"&&l.paid) return true;
+  if(isWonStatus(l.status)&&l.paid) return true;
   return false;
 }
 function isIdleFloorLead(l){
